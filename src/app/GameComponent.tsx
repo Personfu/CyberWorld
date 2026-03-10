@@ -19,6 +19,11 @@ export default function GameComponent() {
     const [playerHp, setPlayerHp] = useState(100);
     const [enemyHp, setEnemyHp] = useState(100);
 
+    // Advanced RPG State
+    const [inventory, setInventory] = useState<any[]>([]);
+    const [showInventory, setShowInventory] = useState(false);
+    const [evolving, setEvolving] = useState<any>(null);
+
     const addSysLog = (msg: string) => {
         setSystemLogs(prev => [...prev.slice(-4), `> ${msg}`]);
     };
@@ -173,6 +178,17 @@ export default function GameComponent() {
 
                 self.socket.on('systemMessage', (data: any) => addSysLog(data.msg));
                 self.socket.on('updateStats', (data: any) => { setScore(data.credits); setLevel(data.level); });
+
+                self.socket.on('evolutionTrigger', (data: any) => {
+                    setEvolving(data);
+                    addSysLog(`CRITICAL: DAEMON [${data.oldName}] IS RECONSTRUCTING...`);
+                    setTimeout(() => setEvolving(null), 5000);
+                });
+
+                self.socket.on('receiveItem', (item: any) => {
+                    setInventory(prev => [...prev, item]);
+                    addSysLog(`ITEM_ACQUIRED: ${item.name}`);
+                });
             }
 
             function drawGrid(self: any) {
@@ -254,6 +270,8 @@ export default function GameComponent() {
 
                     <div className={styles.hudSide}>
                         <div className={styles.nodeNavHeader}>WORLD_NAV</div>
+                        <button className={styles.btnAction} onClick={() => setShowInventory(!showInventory)}>BACKPACK [F2]</button>
+                        <div style={{ margin: '10px 0', borderBottom: '1px solid #444' }}></div>
                         <button className={styles.btnAction} onClick={() => changeRoom('mainframe')}>MAINFRAME</button>
                         <button className={styles.btnAction} onClick={() => changeRoom('lan_valley')}>LAN VALLEY</button>
                         <button className={styles.btnAction} onClick={() => changeRoom('packet_plains')}>PACKET PLAINS</button>
@@ -302,6 +320,64 @@ export default function GameComponent() {
                             <button onClick={() => castMove('PING_FLOOD')} className={styles.moveBtn}>PING_FLOOD</button>
                             <button onClick={() => castMove('RUN')} className={styles.moveBtnRun}>DISCONNECT</button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {showInventory && (
+                <div className={styles.inventoryModal}>
+                    <div className={styles.modalHeader}>
+                        <h2>BACKPACK_STORAGE</h2>
+                        <button onClick={() => setShowInventory(false)}>CLOSE [X]</button>
+                    </div>
+                    <div className={styles.inventoryGrid}>
+                        {inventory.length === 0 && <p className={styles.emptyMsg}>NO_ITEMS_DETECTED</p>}
+                        {inventory.map((item, i) => (
+                            <div key={i} className={styles.inventoryItem}>
+                                <h4>{item.name}</h4>
+                                <p>{item.desc}</p>
+                                <button onClick={() => { /* Use item logic */ }}>EXECUTE()</button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {evolving && (
+                <div className={styles.evolutionOverlay}>
+                    <div className={styles.evolutionFlash}></div>
+                    <div className={styles.evolutionContent}>
+                        <h1 className={styles.glitchText}>RECONSTRUCTING...</h1>
+                        <p>{evolving.oldName} ➔ {evolving.newName}</p>
+                    </div>
+                </div>
+            )}
+
+            {showInventory && (
+                <div className={styles.inventoryModal}>
+                    <div className={styles.modalHeader}>
+                        <h2>BACKPACK_STORAGE</h2>
+                        <button onClick={() => setShowInventory(false)}>CLOSE [X]</button>
+                    </div>
+                    <div className={styles.inventoryGrid}>
+                        {inventory.length === 0 && <p className={styles.emptyMsg}>NO_ITEMS_DETECTED</p>}
+                        {inventory.map((item, i) => (
+                            <div key={i} className={styles.inventoryItem}>
+                                <h4>{item.name}</h4>
+                                <p>{item.desc}</p>
+                                <button onClick={() => { /* Use item logic */ }}>EXECUTE()</button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {evolving && (
+                <div className={styles.evolutionOverlay}>
+                    <div className={styles.evolutionFlash}></div>
+                    <div className={styles.evolutionContent}>
+                        <h1 className={styles.glitchText}>RECONSTRUCTING...</h1>
+                        <p>{evolving.oldName} ➔ {evolving.newName}</p>
                     </div>
                 </div>
             )}

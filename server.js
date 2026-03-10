@@ -2,6 +2,8 @@ const { createServer } = require('http');
 const { parse } = require('url');
 const next = require('next');
 const { Server } = require('socket.io');
+const fs = require('fs');
+const path = require('path');
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = 'localhost';
@@ -24,11 +26,13 @@ const ROOMS = {
 
 // Daemons Database (Subset for now)
 const DAEMON_TYPES = [
-    { name: 'Ping', type: 'Network', hp: 35, atk: 55, def: 40, spd: 90 },
-    { name: 'Tracert', type: 'Network', hp: 55, atk: 70, def: 55, spd: 75 },
+    { name: 'Ping', type: 'Network', hp: 35, atk: 55, def: 40, spd: 90, evolvesAt: 15, evolvesTo: 'Tracert' },
+    { name: 'Tracert', type: 'Network', hp: 55, atk: 70, def: 55, spd: 75, evolvesAt: 30, evolvesTo: 'Nmap' },
     { name: 'Nmap', type: 'Network', hp: 80, atk: 95, def: 70, spd: 60 },
-    { name: 'XSSling', type: 'Web', hp: 38, atk: 60, def: 35, spd: 75 },
-    { name: 'Stacksmash', type: 'Binary', hp: 40, atk: 90, def: 30, spd: 70 },
+    { name: 'XSSling', type: 'Web', hp: 38, atk: 60, def: 35, spd: 75, evolvesAt: 18, evolvesTo: 'SQLmap' },
+    { name: 'SQLmap', type: 'Web', hp: 65, atk: 85, def: 50, spd: 65 },
+    { name: 'Stacksmash', type: 'Binary', hp: 40, atk: 90, def: 30, spd: 70, evolvesAt: 20, evolvesTo: 'KernelPanic' },
+    { name: 'KernelPanic', type: 'Binary', hp: 100, atk: 110, def: 70, spd: 60 },
     { name: 'Hashling', type: 'Crypto', hp: 40, atk: 50, def: 45, spd: 55 },
     { name: 'Probe', type: 'Wireless', hp: 35, atk: 45, def: 35, spd: 85 },
     { name: 'Rubberduck', type: 'Physical', hp: 42, atk: 70, def: 35, spd: 75 },
@@ -199,8 +203,29 @@ app.prepare().then(() => {
             if (data.win) {
                 const reward = 50 + (data.enemyLevel * 10);
                 p.credits += reward;
+
+                // Experience / Evolution Logic
+                const pDaemon = p.party[0];
+                pDaemon.level = (pDaemon.level || 5) + 1;
+
+                const dInfo = DAEMON_TYPES.find(d => d.name === pDaemon.name);
+                if (dInfo && dInfo.evolvesAt && pDaemon.level >= dInfo.evolvesAt) {
+                    const oldName = pDaemon.name;
+                    pDaemon.name = dInfo.evolvesTo;
+                    const nextInfo = DAEMON_TYPES.find(d => d.name === pDaemon.name);
+                    pDaemon.hp = nextInfo.hp;
+                    pDaemon.atk = nextInfo.atk;
+                    socket.emit('evolutionTrigger', { oldName, newName: pDaemon.name });
+                }
+
                 socket.emit('updateStats', { credits: p.credits, level: p.level });
-                socket.emit('systemMessage', { msg: `Daemon Scrubbed. +${reward} Credits.` });
+                socket.emit('systemMessage', { msg: `Daemon Scrubbed. +${reward} Credits. Daemon Gained Level: ${pDaemon.level}` });
+
+                // Random Item Drop
+                if (Math.random() > 0.7) {
+                    const item = { name: 'Wireshark Lens', desc: 'Allows you to see hidden Packet Plains data.' };
+                    socket.emit('receiveItem', item);
+                }
             }
         });
 

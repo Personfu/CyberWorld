@@ -318,6 +318,148 @@
   color: #000;
 }
 
+/* INVENTORY MODAL */
+.inventoryModal {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 600px;
+  height: 400px;
+  background: rgba(0, 10, 5, 0.95);
+  border: 2px solid #00ffcc;
+  box-shadow: 0 0 30px rgba(0, 255, 204, 0.3);
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  border-bottom: 1px solid #00ffcc;
+  background: rgba(0, 40, 20, 0.5);
+}
+
+.modalHeader h2 {
+  margin: 0;
+  font-size: 1rem;
+  letter-spacing: 3px;
+}
+
+.modalHeader button {
+  background: transparent;
+  border: 1px solid #ff0055;
+  color: #ff0055;
+  cursor: pointer;
+  padding: 5px 10px;
+  font-family: inherit;
+}
+
+.inventoryGrid {
+  flex-grow: 1;
+  padding: 20px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 15px;
+  overflow-y: auto;
+}
+
+.inventoryItem {
+  background: rgba(0, 255, 204, 0.05);
+  border: 1px solid rgba(0, 255, 204, 0.2);
+  padding: 10px;
+  text-align: center;
+}
+
+.inventoryItem h4 {
+  margin: 0 0 5px;
+  font-size: 0.9rem;
+  color: #00ffcc;
+}
+
+.inventoryItem p {
+  margin: 0 0 10px;
+  font-size: 0.7rem;
+  color: #888;
+}
+
+.inventoryItem button {
+  background: #00ffcc;
+  color: #000;
+  border: none;
+  padding: 5px 10px;
+  font-size: 0.7rem;
+  font-weight: bold;
+  cursor: pointer;
+  width: 100%;
+}
+
+.emptyMsg {
+  grid-column: span 3;
+  color: #444;
+  text-align: center;
+  margin-top: 50px;
+}
+
+/* EVOLUTION OVERLAY */
+.evolutionOverlay {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.evolutionFlash {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  opacity: 0;
+  animation: flash 1s forwards;
+}
+
+.evolutionContent {
+  text-align: center;
+  z-index: 1001;
+}
+
+.glitchText {
+  font-size: 3rem;
+  color: #00ffcc;
+  text-shadow: 2px 2px #ff0055;
+  animation: glitch 0.2s infinite;
+}
+
+@keyframes flash {
+  0% {
+    opacity: 0.8;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes glitch {
+  0% {
+    transform: translate(0);
+  }
+
+  50% {
+    transform: translate(-2px, 2px);
+  }
+
+  100% {
+    transform: translate(2px, -2px);
+  }
+}
+
 @keyframes pulse {
   0% {
     opacity: 0.4;
