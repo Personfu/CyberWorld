@@ -1,3 +1,4 @@
+import * as React from 'react';
 export default function Page() {
   const [GameComponent, setGameComponent] = React.useState<any>(null);
 
