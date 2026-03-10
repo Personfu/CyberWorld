@@ -9,6 +9,9 @@
   color: #00ffcc;
   font-family: 'Courier New', Courier, monospace;
   overflow: hidden;
+  position: relative;
+  margin: 0;
+  padding: 0;
 }
 
 .terminalHeader {
@@ -18,14 +21,21 @@
   font-size: 2rem;
   letter-spacing: 5px;
   animation: pulse 2s infinite;
+  position: absolute;
+  top: 10px;
+  z-index: 200;
+  pointer-events: none;
 }
 
 .gameContainer {
-  position: relative;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   border: 1px solid #00ffcc;
   box-shadow: 0 0 15px #00ffcc, inset 0 0 10px #00ffcc;
   background-color: #000;
-  border-radius: 4px;
 }
 
 .gameContainer::after {
@@ -36,24 +46,102 @@
   right: 0;
   bottom: 0;
   pointer-events: none;
-  background: linear-gradient(rgba(0,0,0,0) 50%, rgba(0, 255, 204, 0.05) 50%);
+  background: linear-gradient(rgba(0, 0, 0, 0) 50%, rgba(0, 255, 204, 0.05) 50%);
   background-size: 100% 4px;
   z-index: 100;
 }
 
 .statsOverlay {
   position: absolute;
-  top: 10px;
-  left: 10px;
+  top: 20px;
+  left: 20px;
   color: #ff0055;
   text-shadow: 0 0 5px #ff0055;
-  font-size: 1.2rem;
-  z-index: 100;
+  font-size: 1.5rem;
+  z-index: 200;
+  pointer-events: none;
+  font-weight: bold;
+}
+
+.logContainer {
+  position: absolute;
+  bottom: 60px;
+  left: 20px;
+  width: 400px;
+  max-height: 150px;
+  overflow: hidden;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
   pointer-events: none;
 }
 
+.logText {
+  color: #00ffcc;
+  font-size: 0.9rem;
+  text-shadow: 0 0 5px #00ffcc;
+  margin-bottom: 2px;
+  animation: fadeIn 0.3s;
+}
+
+.chatForm {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  z-index: 200;
+  display: flex;
+  width: 400px;
+}
+
+.chatInput {
+  flex-grow: 1;
+  background: rgba(0, 50, 40, 0.5);
+  border: 1px solid #00ffcc;
+  color: #fff;
+  padding: 8px 12px;
+  font-family: inherit;
+  outline: none;
+  font-size: 1rem;
+}
+
+.chatInput:focus {
+  background: rgba(0, 80, 60, 0.8);
+  box-shadow: 0 0 10px #00ffcc;
+}
+
+.chatButton {
+  background: #00ffcc;
+  color: #000;
+  border: none;
+  font-weight: bold;
+  padding: 0 15px;
+  cursor: pointer;
+}
+
 @keyframes pulse {
-  0% { opacity: 0.8; }
-  50% { opacity: 1; text-shadow: 0 0 15px #00ffcc, 0 0 30px #00ffcc; }
-  100% { opacity: 0.8; }
+  0% {
+    opacity: 0.8;
+  }
+
+  50% {
+    opacity: 1;
+    text-shadow: 0 0 15px #00ffcc, 0 0 30px #00ffcc;
+  }
+
+  100% {
+    opacity: 0.8;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

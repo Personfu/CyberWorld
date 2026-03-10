@@ -26,14 +26,19 @@ app.prepare().then(() => {
 
     const players = {};
     const dataNodes = {};
+    const projectiles = {};
+    let projId = 0;
+
+    // Boundary constraints
+    const MAP_LIMIT = 3000;
 
     // Spawn initial nodes
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 20; i++) {
         const nodeId = 'node_' + Math.random().toString(36).substr(2, 9);
         dataNodes[nodeId] = {
             id: nodeId,
-            x: Math.floor(Math.random() * 2000) - 1000,
-            y: Math.floor(Math.random() * 2000) - 1000,
+            x: Math.floor(Math.random() * MAP_LIMIT * 2) - MAP_LIMIT,
+            y: Math.floor(Math.random() * MAP_LIMIT * 2) - MAP_LIMIT,
             value: Math.floor(Math.random() * 50) + 10
         };
     }
@@ -47,6 +52,8 @@ app.prepare().then(() => {
             y: Math.floor(Math.random() * 400) - 200,
             rotation: 0,
             score: 0,
+            hp: 100,
+            maxHp: 100,
             faction: (Math.random() > 0.5) ? 'cyber' : 'neon'
         };
 
@@ -63,7 +70,31 @@ app.prepare().then(() => {
             io.emit('disconnectPlayer', socket.id);
         });
 
+        socket.on('chatMessage', (msg) => {
+            const safeMsg = String(msg).substring(0, 100);
+            io.emit('chatMessage', { sender: players[socket.id].faction.toUpperCase() + '-' + socket.id.substring(0, 4), msg: safeMsg });
+        });
+
+        socket.on('fireProjectile', (data) => {
+            const id = projId++;
+            // Calculate velocity based on rotation
+            const speed = 800;
+            projectiles[id] = {
+                id: id,
+                ownerId: socket.id,
+                faction: players[socket.id].faction,
+                x: data.x,
+                y: data.y,
+                vx: Math.cos(data.rotation) * speed,
+                vy: Math.sin(data.rotation) * speed,
+                rotation: data.rotation,
+                life: 1.5 // seconds
+            };
+            io.emit('projectileFired', projectiles[id]);
+        });
+
         socket.on('playerMovement', function (movementData) {
+            if (!players[socket.id]) return;
             players[socket.id].x = movementData.x;
             players[socket.id].y = movementData.y;
             players[socket.id].rotation = movementData.rotation;
@@ -71,27 +102,81 @@ app.prepare().then(() => {
         });
 
         socket.on('collectNode', function (nodeId) {
-            if (dataNodes[nodeId]) {
+            if (dataNodes[nodeId] && players[socket.id]) {
                 const val = dataNodes[nodeId].value;
                 players[socket.id].score += val;
+
+                // Heal on node collection
+                players[socket.id].hp = Math.min(players[socket.id].hp + 10, players[socket.id].maxHp);
+
                 delete dataNodes[nodeId];
 
-                io.emit('nodeCollected', { playerId: socket.id, nodeId: nodeId, newScore: players[socket.id].score });
+                io.emit('nodeCollected', { playerId: socket.id, nodeId: nodeId, newScore: players[socket.id].score, hp: players[socket.id].hp });
 
                 // Respawn a new node
                 setTimeout(() => {
                     const newId = 'node_' + Math.random().toString(36).substr(2, 9);
                     dataNodes[newId] = {
                         id: newId,
-                        x: Math.floor(Math.random() * 2000) - 1000,
-                        y: Math.floor(Math.random() * 2000) - 1000,
+                        x: Math.floor(Math.random() * MAP_LIMIT * 2) - MAP_LIMIT,
+                        y: Math.floor(Math.random() * MAP_LIMIT * 2) - MAP_LIMIT,
                         value: Math.floor(Math.random() * 80) + 20
                     };
-                    io.emit('dataNodes', dataNodes); // Or just a newNode event
-                }, 3000);
+                    io.emit('newNode', dataNodes[newId]);
+                }, 2000);
+            }
+        });
+
+        socket.on('projectileHit', (hitData) => {
+            // Very basic server trust for hits (would need server-side calc for prod)
+            const targetId = hitData.targetId;
+            const pId = hitData.projectileId;
+
+            if (projectiles[pId]) {
+                delete projectiles[pId];
+                io.emit('projectileDestroyed', pId);
+            }
+
+            if (players[targetId]) {
+                players[targetId].hp -= 20; // damage amount
+                io.emit('playerDamaged', { playerId: targetId, hp: players[targetId].hp });
+
+                if (players[targetId].hp <= 0) {
+                    // KILL
+                    io.emit('playerDestroyed', targetId);
+
+                    // Award points to shooter if known
+                    if (players[hitData.shooterId]) {
+                        players[hitData.shooterId].score += 150;
+                        io.emit('scoreUpdate', { playerId: hitData.shooterId, score: players[hitData.shooterId].score });
+                    }
+
+                    // Respawn
+                    setTimeout(() => {
+                        if (players[targetId]) {
+                            players[targetId].hp = players[targetId].maxHp;
+                            players[targetId].x = Math.floor(Math.random() * 400) - 200;
+                            players[targetId].y = Math.floor(Math.random() * 400) - 200;
+                            io.emit('playerRespawn', players[targetId]);
+                        }
+                    }, 3000);
+                }
             }
         });
     });
+
+    // Server-side projectile loop
+    const TICK_RATE = 1000 / 30;
+    setInterval(() => {
+        Object.keys(projectiles).forEach(id => {
+            const p = projectiles[id];
+            p.life -= (TICK_RATE / 1000);
+            if (p.life <= 0) {
+                delete projectiles[id];
+                io.emit('projectileDestroyed', id);
+            }
+        });
+    }, TICK_RATE);
 
     server.once('error', (err) => {
         console.error(err);
@@ -99,6 +184,6 @@ app.prepare().then(() => {
     });
 
     server.listen(port, () => {
-        console.log(`> CyberWorld Simulation Engine Online - Port ${port}`);
+        console.log(`> CyberWorld MMORPG Simulation Server Online - Port ${port}`);
     });
 });
