@@ -5,13 +5,23 @@ import styles from './cyber.module.css';
 
 export default function GameComponent() {
     const gameRef = useRef<Game | null>(null);
-    const [score, setScore] = useState(0);
-    const [logs, setLogs] = useState<string[]>([]);
-    const [chatInput, setChatInput] = useState('');
     const socketRef = useRef<any>(null);
 
-    const addLog = (msg: string) => {
-        setLogs(prev => [...prev.slice(-4), msg]);
+    const [score, setScore] = useState(0);
+    const [level, setLevel] = useState(1);
+    const [roomInfo, setRoomInfo] = useState({ name: 'INIT', desc: 'WAITING FOR UPLINK...' });
+    const [chatInput, setChatInput] = useState('');
+    const [systemLogs, setSystemLogs] = useState<string[]>([]);
+
+    // Battle State
+    const [inBattle, setInBattle] = useState(false);
+    const [battleData, setBattleData] = useState<any>(null);
+    const [battleLog, setBattleLog] = useState<string[]>([]);
+    const [playerHp, setPlayerHp] = useState(100);
+    const [enemyHp, setEnemyHp] = useState(100);
+
+    const addSysLog = (msg: string) => {
+        setSystemLogs(prev => [...prev.slice(-4), `> ${msg}`]);
     };
 
     useEffect(() => {
@@ -25,18 +35,8 @@ export default function GameComponent() {
                 width: typeof window !== 'undefined' ? window.innerWidth : 1000,
                 height: typeof window !== 'undefined' ? window.innerHeight : 600,
                 backgroundColor: '#050505',
-                physics: {
-                    default: 'arcade',
-                    arcade: {
-                        debug: false,
-                        gravity: { y: 0, x: 0 }
-                    }
-                },
-                scene: {
-                    preload: preload,
-                    create: create,
-                    update: update
-                }
+                physics: { default: 'arcade', arcade: { debug: false } },
+                scene: { preload: preload, create: create, update: update }
             };
 
             if (!gameRef.current) {
@@ -44,357 +44,367 @@ export default function GameComponent() {
             }
 
             function preload(this: Phaser.Scene) {
-                // Drawing textures dynamically
-                const graphics = this.add.graphics();
+                const gfx = this.add.graphics();
 
-                // Projectile Cyber
-                graphics.fillStyle(0x00ffcc, 1);
-                graphics.fillRect(0, 0, 10, 4);
-                graphics.generateTexture('proj_cyber', 10, 4);
-                graphics.clear();
+                // Avatar (ClubPenguin Style)
+                gfx.fillStyle(0xffffff, 1);
+                gfx.fillRoundedRect(0, 0, 40, 60, 10);
+                gfx.fillStyle(0x000000, 1);
+                gfx.fillRect(5, 10, 30, 15);
+                gfx.generateTexture('avatar', 40, 60);
+                gfx.clear();
 
-                // Projectile Neon
-                graphics.fillStyle(0xff00ff, 1);
-                graphics.fillRect(0, 0, 10, 4);
-                graphics.generateTexture('proj_neon', 10, 4);
-                graphics.clear();
+                // Wild Daemon (Pokemon Style)
+                gfx.lineStyle(2, 0xff0055, 1);
+                gfx.strokeCircle(20, 20, 20);
+                gfx.fillStyle(0xff0055, 0.5);
+                gfx.fillCircle(20, 20, 20);
+                gfx.generateTexture('daemon', 40, 40);
+                gfx.clear();
             }
 
             function create(this: Phaser.Scene) {
                 const self = this as any;
-                self.socket = io();
+                self.socket = io({ transports: ['websocket', 'polling'] });
                 socketRef.current = self.socket;
 
-                // Cyber Grid Background
-                const gridGraphics = self.add.graphics();
-                gridGraphics.lineStyle(2, 0x00ffcc, 0.05);
-                for (let i = 0; i < 6000; i += 100) {
-                    gridGraphics.moveTo(-3000, i - 3000);
-                    gridGraphics.lineTo(3000, i - 3000);
-                    gridGraphics.moveTo(i - 3000, -3000);
-                    gridGraphics.lineTo(i - 3000, 3000);
-                }
-                gridGraphics.strokePath();
+                self.otherPlayers = self.physics.add.group();
+                self.wildDaemons = self.physics.add.group();
+                self.chatBubbles = {};
+                self.activeTweens = {};
 
-                self.otherPlayers = self.add.group();
-                self.dataNodes = self.add.group();
-                self.projectiles = self.add.group();
+                self.grid = self.add.graphics();
+                window.addEventListener('resize', () => drawGrid(self));
+                drawGrid(self);
 
-                self.socket.on('currentPlayers', (players: any) => {
-                    Object.keys(players).forEach((id) => {
-                        if (players[id].playerId === self.socket.id) {
-                            addPlayer(self, players[id]);
-                            setScore(players[id].score);
-                            addLog(`UPLINK SECURED. FACTION: ${players[id].faction.toUpperCase()}`);
-                        } else {
-                            addOtherPlayers(self, players[id]);
+                // Click to move or interact
+                self.input.on('pointerdown', (pointer: any) => {
+                    if (!self.player || inBattle) return;
+
+                    // Check if clicking on Daemon
+                    let clickedDaemon = null;
+                    self.wildDaemons.getChildren().forEach((d: any) => {
+                        if (d.getBounds().contains(pointer.worldX, pointer.worldY)) {
+                            clickedDaemon = d.daemonId;
                         }
                     });
-                });
 
-                self.socket.on('dataNodes', (nodes: any) => {
-                    self.dataNodes.clear(true, true);
-                    Object.keys(nodes).forEach((id) => {
-                        const node = nodes[id];
-                        const n = self.add.circle(node.x, node.y, 8, 0xff0055);
-                        n.nodeId = node.id;
-                        self.physics.add.existing(n);
-                        self.dataNodes.add(n);
-                        self.tweens.add({
-                            targets: n,
-                            scaleX: 1.5,
-                            scaleY: 1.5,
-                            alpha: 0.5,
-                            duration: 500,
-                            yoyo: true,
-                            repeat: -1
-                        });
-                    });
-                });
-
-                self.socket.on('newNode', (node: any) => {
-                    const n = self.add.circle(node.x, node.y, 8, 0xff0055);
-                    n.nodeId = node.id;
-                    self.physics.add.existing(n);
-                    self.dataNodes.add(n);
-                    self.tweens.add({
-                        targets: n, scaleX: 1.5, scaleY: 1.5, alpha: 0.5, duration: 500, yoyo: true, repeat: -1
-                    });
-                });
-
-                self.socket.on('newPlayer', (playerInfo: any) => {
-                    addOtherPlayers(self, playerInfo);
-                    addLog(`NEW ENTITY DETECTED.`);
-                });
-
-                self.socket.on('disconnectPlayer', (playerId: string) => {
-                    self.otherPlayers.getChildren().forEach((otherPlayer: any) => {
-                        if (playerId === otherPlayer.playerId) {
-                            otherPlayer.destroy();
-                            if (otherPlayer.label) otherPlayer.label.destroy();
-                            if (otherPlayer.hpBar) otherPlayer.hpBar.destroy();
-                        }
-                    });
-                });
-
-                self.socket.on('playerMoved', (playerInfo: any) => {
-                    self.otherPlayers.getChildren().forEach((otherPlayer: any) => {
-                        if (playerInfo.playerId === otherPlayer.playerId) {
-                            otherPlayer.setPosition(playerInfo.x, playerInfo.y);
-                            otherPlayer.setRotation(playerInfo.rotation);
-                            if (otherPlayer.label) {
-                                otherPlayer.label.setPosition(playerInfo.x, playerInfo.y + 25);
-                                otherPlayer.hpBar.setPosition(playerInfo.x - 20, playerInfo.y - 35);
-                            }
-                        }
-                    });
-                });
-
-                self.socket.on('nodeCollected', (data: any) => {
-                    self.dataNodes.getChildren().forEach((n: any) => {
-                        if (n.nodeId === data.nodeId) { n.destroy(); }
-                    });
-                    if (data.playerId === self.socket.id) {
-                        setScore(data.newScore);
-                        addLog('DATA NODE MINED [+SCORE]');
-                        if (self.ship) {
-                            self.ship.hpInfo = data.hp;
-                            updateHPBar(self, self.ship);
-                        }
+                    if (clickedDaemon) {
+                        // Initiate Battle Request
+                        self.socket.emit('initiateBattle', clickedDaemon);
+                        addSysLog(`ANALYZING THREAT...`);
+                        return;
                     }
+
+                    const targetX = pointer.worldX;
+                    const targetY = pointer.worldY;
+
+                    startMoveCoroutine(self, self.player, targetX, targetY);
+                    self.socket.emit('playerMoveTarget', { x: targetX, y: targetY, startX: self.player.x, startY: self.player.y });
+                });
+
+                self.socket.on('joinedRoom', (data: any) => {
+                    setRoomInfo(data.roomDetails);
+                    self.otherPlayers.clear(true, true);
+                    self.wildDaemons.clear(true, true);
+
+                    Object.keys(data.players).forEach(id => {
+                        if (id === self.socket.id) {
+                            addPlayer(self, data.players[id]);
+                        } else {
+                            addOtherPlayers(self, data.players[id]);
+                        }
+                    });
+
+                    Object.keys(data.daemons).forEach(id => {
+                        spawnDaemon(self, data.daemons[id]);
+                    });
+
+                    addSysLog(`ENTERED: ${data.roomDetails.name}`);
+                });
+
+                self.socket.on('spawnDaemon', (dData: any) => {
+                    spawnDaemon(self, dData);
+                });
+
+                self.socket.on('removeDaemon', (dId: string) => {
+                    self.wildDaemons.getChildren().forEach((d: any) => {
+                        if (d.daemonId === dId) {
+                            d.destroy();
+                            if (d.nameTag) d.nameTag.destroy();
+                        }
+                    });
+                });
+
+                self.socket.on('newPlayer', (playerInfo: any) => addOtherPlayers(self, playerInfo));
+
+                self.socket.on('disconnectPlayer', (id: string) => {
+                    self.otherPlayers.getChildren().forEach((p: any) => {
+                        if (p.playerId === id) {
+                            p.destroy();
+                            if (p.nameTag) p.nameTag.destroy();
+                            if (self.chatBubbles[id]) self.chatBubbles[id].destroy();
+                        }
+                    });
+                });
+
+                self.socket.on('playerMoving', (data: any) => {
+                    self.otherPlayers.getChildren().forEach((p: any) => {
+                        if (p.playerId === data.playerId) {
+                            p.setPosition(data.startX, data.startY);
+                            startMoveCoroutine(self, p, data.targetX, data.targetY);
+                        }
+                    });
                 });
 
                 self.socket.on('chatMessage', (data: any) => {
-                    addLog(`[${data.sender}]: ${data.msg}`);
-                });
-
-                self.socket.on('projectileFired', (pData: any) => {
-                    const type = pData.faction === 'cyber' ? 'proj_cyber' : 'proj_neon';
-                    const proj = self.physics.add.sprite(pData.x, pData.y, type);
-                    proj.projId = pData.id;
-                    proj.ownerId = pData.ownerId;
-                    proj.setRotation(pData.rotation);
-                    proj.setVelocity(pData.vx, pData.vy);
-                    self.projectiles.add(proj);
-                });
-
-                self.socket.on('playerDamaged', (data: any) => {
-                    // For others
-                    self.otherPlayers.getChildren().forEach((p: any) => {
-                        if (p.playerId === data.playerId) {
-                            p.hpInfo = data.hp;
-                            updateHPBar(self, p);
-                        }
-                    });
-                    // For self
-                    if (self.ship && self.socket.id === data.playerId) {
-                        self.ship.hpInfo = data.hp;
-                        updateHPBar(self, self.ship);
-                    }
-                });
-
-                self.socket.on('playerDestroyed', (targetId: string) => {
-                    if (targetId === self.socket.id) {
-                        addLog("CRITICAL: SYS_HALT. REBOOTING...");
-                        if (self.ship) {
-                            self.ship.destroy();
-                            self.ship.hpBar.destroy();
-                            self.ship = null;
-                        }
-                    } else {
+                    const id = data.senderId;
+                    let target = null;
+                    if (id === self.socket.id) target = self.player;
+                    else {
                         self.otherPlayers.getChildren().forEach((p: any) => {
-                            if (p.playerId === targetId) {
-                                p.destroy();
-                                if (p.label) p.label.destroy();
-                                if (p.hpBar) p.hpBar.destroy();
+                            if (p.playerId === id) target = p;
+                        });
+                    }
+
+                    if (target) {
+                        if (self.chatBubbles[id]) self.chatBubbles[id].destroy();
+
+                        const bubble = self.add.text(target.x, target.y - 60, data.msg, {
+                            backgroundColor: 'rgba(0,0,0,0.8)', padding: { x: 8, y: 5 },
+                            color: '#00ffcc', fontSize: '14px', borderColor: '#00ffcc',
+                            borderThickness: 1, wordWrap: { width: 150 }
+                        }).setOrigin(0.5, 1);
+
+                        self.chatBubbles[id] = bubble;
+
+                        self.time.delayedCall(4000, () => {
+                            if (bubble && bubble.active) {
+                                self.tweens.add({
+                                    targets: bubble, alpha: 0, duration: 500,
+                                    onComplete: () => { bubble.destroy(); delete self.chatBubbles[id]; }
+                                });
                             }
                         });
                     }
                 });
 
-                self.socket.on('playerRespawn', (pData: any) => {
-                    if (pData.playerId === self.socket.id) {
-                        addPlayer(self, pData);
-                        addLog("SIGNAL RE-ESTABLISHED.");
-                    } else {
-                        addOtherPlayers(self, pData);
-                    }
+                self.socket.on('systemMessage', (data: any) => addSysLog(data.msg));
+
+                self.socket.on('updateStats', (data: any) => {
+                    setScore(data.credits);
+                    setLevel(data.level);
                 });
 
-                self.socket.on('scoreUpdate', (data: any) => {
-                    if (data.playerId === self.socket.id) {
-                        setScore(data.score);
-                        addLog("TERMINATION BOUNTY [+150]");
-                    }
+                // BATTLE TRIGGERS
+                self.socket.on('battleStart', (data: any) => {
+                    setInBattle(true);
+                    setBattleData(data);
+                    setPlayerHp(data.playerDaemon.hp);
+                    setEnemyHp(data.enemy.hp);
+                    setBattleLog([`WILD [${data.enemy.name}] (${data.enemy.type}) APPEARED!`, `GO, [${data.playerDaemon.name}]!`]);
                 });
 
-                self.cursors = self.input.keyboard.createCursorKeys();
-                self.wKey = self.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W);
-                self.aKey = self.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
-                self.sKey = self.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S);
-                self.dKey = self.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
+                self.socket.on('battleTurnResult', (result: any) => {
+                    setBattleLog(prev => [...prev.slice(-3), result.log]);
+                    setEnemyHp(prev => Math.max(0, prev - result.enemyDamageTaken));
+                    setPlayerHp(prev => Math.max(0, prev - result.playerDamageTaken));
 
-                self.input.on('pointerdown', (pointer: any) => {
-                    if (!self.ship) return;
-                    // Calculate angle
-                    const angle = Phaser.Math.Angle.Between(
-                        self.cameras.main.centerX,
-                        self.cameras.main.centerY,
-                        pointer.x,
-                        pointer.y
-                    );
-
-                    // Offset spawn point
-                    const spawnX = self.ship.x + Math.cos(angle) * 30;
-                    const spawnY = self.ship.y + Math.sin(angle) * 30;
-
-                    self.socket.emit('fireProjectile', { x: spawnX, y: spawnY, rotation: angle });
+                    // Check win/loss logic here on frontend just for UI purposes
+                    setTimeout(() => {
+                        if ((enemyHp - result.enemyDamageTaken) <= 0) {
+                            setBattleLog(prev => [...prev.slice(-3), `ENEMY DEFEATED.`]);
+                            setTimeout(() => {
+                                setInBattle(false);
+                                self.socket.emit('battleEnd', { win: true });
+                            }, 2000);
+                        } else if ((playerHp - result.playerDamageTaken) <= 0) {
+                            setBattleLog(prev => [...prev.slice(-3), `YOUR DAEMON CRASHED.`]);
+                            setTimeout(() => {
+                                setInBattle(false);
+                                self.socket.emit('battleEnd', { win: false });
+                            }, 2000);
+                        }
+                    }, 1000);
                 });
-
             }
 
-            function updateHPBar(self: any, entity: any) {
-                if (!entity || !entity.hpBar) return;
-                entity.hpBar.clear();
-                entity.hpBar.fillStyle(0x000000, 1);
-                entity.hpBar.fillRect(0, 0, 40, 5);
-                entity.hpBar.fillStyle(entity.faction === 'neon' ? 0xff00ff : 0x00ffcc, 1);
-                entity.hpBar.fillRect(0, 0, 40 * (entity.hpInfo / 100), 5);
+            function drawGrid(self: any) {
+                if (!self.grid) return;
+                self.grid.clear();
+                self.grid.lineStyle(1, 0x00ffcc, 0.1);
+                const w = typeof window !== 'undefined' ? window.innerWidth : 1000;
+                const h = typeof window !== 'undefined' ? window.innerHeight : 600;
+                for (let i = 0; i < w; i += 40) { self.grid.moveTo(i, 0); self.grid.lineTo(i, h); }
+                for (let j = 0; j < h; j += 40) { self.grid.moveTo(0, j); self.grid.lineTo(w, j); }
+                self.grid.strokePath();
+            }
+
+            function startMoveCoroutine(self: any, entity: any, tx: number, ty: number) {
+                const distance = Phaser.Math.Distance.Between(entity.x, entity.y, tx, ty);
+                const time = (distance / 200) * 1000;
+                if (self.activeTweens[entity.playerId]) self.activeTweens[entity.playerId].stop();
+                self.activeTweens[entity.playerId] = self.tweens.add({
+                    targets: entity, x: tx, y: ty, duration: time, ease: 'Linear'
+                });
             }
 
             function addPlayer(self: any, playerInfo: any) {
-                self.ship = self.add.triangle(playerInfo.x, playerInfo.y, 0, -20, -15, 15, 15, 15, playerInfo.faction === 'cyber' ? 0x00ffcc : 0xff00ff);
-                self.physics.add.existing(self.ship);
-                self.ship.faction = playerInfo.faction;
-                self.ship.hpInfo = playerInfo.hp;
-                self.ship.hpBar = self.add.graphics();
-                updateHPBar(self, self.ship);
-
-                self.ship.body.setDrag(200);
-                self.ship.body.setAngularDrag(100);
-                self.ship.body.setMaxVelocity(400);
-                self.ship.body.setCollideWorldBounds(true);
-
-                self.physics.world.setBounds(-3000, -3000, 6000, 6000);
-                self.cameras.main.startFollow(self.ship);
-                self.cameras.main.setBounds(-3000, -3000, 6000, 6000);
-
-                // Node collection collision
-                self.physics.add.overlap(self.ship, self.dataNodes, (ship: any, node: any) => {
-                    self.socket.emit('collectNode', node.nodeId);
-                    node.destroy();
-                }, undefined, self);
-
-                // Projectile collision
-                self.physics.add.overlap(self.ship, self.projectiles, (ship: any, proj: any) => {
-                    if (proj.ownerId !== self.socket.id) {
-                        self.socket.emit('projectileHit', { targetId: self.socket.id, projectileId: proj.projId, shooterId: proj.ownerId });
-                        proj.destroy();
-                    }
-                }, undefined, self);
+                if (self.player) { self.player.destroy(); if (self.player.nameTag) self.player.nameTag.destroy(); }
+                self.player = self.physics.add.sprite(playerInfo.x, playerInfo.y, 'avatar').setTint(parseInt(playerInfo.color, 16));
+                self.player.playerId = playerInfo.playerId;
+                self.player.nameTag = self.add.text(playerInfo.x, playerInfo.y + 40, playerInfo.name, { color: '#ffffff', fontSize: '12px', fontStyle: 'bold', backgroundColor: 'rgba(0,0,0,0.5)', padding: { x: 2, y: 2 } }).setOrigin(0.5);
+                self.cameras.main.startFollow(self.player, false, 0.1, 0.1);
+                setScore(playerInfo.credits);
+                setLevel(playerInfo.level);
             }
 
             function addOtherPlayers(self: any, playerInfo: any) {
-                const otherPlayer = self.add.triangle(playerInfo.x, playerInfo.y, 0, -20, -15, 15, 15, 15, playerInfo.faction === 'cyber' ? 0x00ffcc : 0xff00ff);
-                self.physics.add.existing(otherPlayer);
-                otherPlayer.setOrigin(0.5, 0.5);
-                otherPlayer.playerId = playerInfo.playerId;
-                otherPlayer.faction = playerInfo.faction;
-                otherPlayer.hpInfo = playerInfo.hp;
+                const other = self.physics.add.sprite(playerInfo.x, playerInfo.y, 'avatar').setTint(parseInt(playerInfo.color, 16));
+                other.playerId = playerInfo.playerId;
+                other.nameTag = self.add.text(playerInfo.x, playerInfo.y + 40, playerInfo.name, { color: '#ffffff', fontSize: '12px', backgroundColor: 'rgba(0,0,0,0.5)', padding: { x: 2, y: 2 } }).setOrigin(0.5);
+                self.otherPlayers.add(other);
+            }
 
-                otherPlayer.hpBar = self.add.graphics();
-                updateHPBar(self, otherPlayer);
+            function spawnDaemon(self: any, dInfo: any) {
+                const d = self.physics.add.sprite(dInfo.x, dInfo.y, 'daemon');
+                d.daemonId = dInfo.id;
+                d.nameTag = self.add.text(dInfo.x, dInfo.y - 30, `[Lv.${dInfo.level}]\n${dInfo.name}`, { color: '#ff0055', fontSize: '10px', align: 'center' }).setOrigin(0.5);
+                self.wildDaemons.add(d);
 
-                otherPlayer.label = self.add.text(playerInfo.x, playerInfo.y + 25, playerInfo.playerId.substring(0, 4), { fontSize: '12px', fill: '#fff' }).setOrigin(0.5);
-                self.otherPlayers.add(otherPlayer);
+                // Wild movement tween
+                self.tweens.add({
+                    targets: d,
+                    y: dInfo.y - 10,
+                    duration: 1000,
+                    yoyo: true,
+                    repeat: -1,
+                    ease: 'Sine.easeInOut'
+                });
             }
 
             function update(this: Phaser.Scene) {
                 const self = this as any;
-                if (self.ship) {
-
-                    // Mouse rotation
-                    const pointer = self.input.activePointer;
-                    const angle = Phaser.Math.Angle.Between(
-                        self.cameras.main.centerX,
-                        self.cameras.main.centerY,
-                        pointer.x,
-                        pointer.y
-                    );
-
-                    // Adjust to point triangle top towards mouse
-                    self.ship.rotation = angle + Math.PI / 2;
-
-                    if (self.wKey.isDown || self.cursors.up.isDown) {
-                        self.physics.velocityFromRotation(angle, 350, self.ship.body.velocity);
-                    } else if (self.sKey.isDown || self.cursors.down.isDown) {
-                        self.physics.velocityFromRotation(angle, -150, self.ship.body.velocity);
-                    } else {
-                        self.ship.body.setAcceleration(0);
-                        self.ship.body.setDrag(600);
-                    }
-
-                    self.ship.hpBar.setPosition(self.ship.x - 20, self.ship.y - 35);
-
-                    // Sync
-                    const x = self.ship.x;
-                    const y = self.ship.y;
-                    const r = self.ship.rotation;
-
-                    if (self.ship.oldPosition && (x !== self.ship.oldPosition.x || y !== self.ship.oldPosition.y || r !== self.ship.oldPosition.rotation)) {
-                        self.socket.emit('playerMovement', { x: self.ship.x, y: self.ship.y, rotation: self.ship.rotation });
-                    }
-
-                    self.ship.oldPosition = {
-                        x: self.ship.x,
-                        y: self.ship.y,
-                        rotation: self.ship.rotation
-                    };
+                if (self.player) {
+                    self.player.nameTag.setPosition(self.player.x, self.player.y + 40);
+                    if (self.chatBubbles[self.player.playerId]) self.chatBubbles[self.player.playerId].setPosition(self.player.x, self.player.y - 60);
+                }
+                if (self.otherPlayers) {
+                    self.otherPlayers.getChildren().forEach((p: any) => {
+                        p.nameTag.setPosition(p.x, p.y + 40);
+                        if (self.chatBubbles[p.playerId]) self.chatBubbles[p.playerId].setPosition(p.x, p.y - 60);
+                    });
+                }
+                if (self.wildDaemons) {
+                    self.wildDaemons.getChildren().forEach((d: any) => {
+                        d.nameTag.setPosition(d.x, d.y - 30);
+                    });
                 }
             }
         }
 
         initPhaser();
-
-        return () => {
-            if (gameRef.current) {
-                gameRef.current.destroy(true);
-                gameRef.current = null;
-            }
-        };
+        return () => { if (gameRef.current) { gameRef.current.destroy(true); gameRef.current = null; } };
     }, []);
 
     const handleChat = (e: React.FormEvent) => {
         e.preventDefault();
-        if (chatInput.trim() && socketRef.current) {
+        if (chatInput.trim() !== '' && socketRef.current) {
             socketRef.current.emit('chatMessage', chatInput.trim());
             setChatInput('');
         }
     };
 
+    const changeRoom = (newRoom: string) => {
+        if (socketRef.current) socketRef.current.emit('changeRoom', newRoom);
+    };
+
+    const castMove = (moveName: string) => {
+        if (socketRef.current && inBattle) {
+            socketRef.current.emit('battleAction', { move: moveName });
+        }
+    };
+
     return (
-        <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-            <div id="phaser-game"></div>
+        <div className={styles.gameWrapper}>
+            <div id="phaser-game" style={{ display: inBattle ? 'none' : 'block' }}></div>
 
-            {/* UI Overlay */}
-            <div className={styles.statsOverlay}>
-                CYBER_CREDITS: [{score}]
-            </div>
+            {/* OVERWORLD HUD */}
+            {!inBattle && (
+                <>
+                    <div className={styles.hudTop}>
+                        <div className={styles.hudPanel}>
+                            <h2>{roomInfo.name}</h2>
+                            <p>{roomInfo.desc}</p>
+                        </div>
 
-            <div className={styles.logContainer}>
-                {logs.map((log, i) => <div key={i} className={styles.logText}> {log} </div>)}
-            </div>
+                        <div className={styles.hudPanelRight}>
+                            <div>LVL: <span className={styles.hlt}>{level}</span></div>
+                            <div>CREDITS: <span className={styles.hlt}>{score}</span> F-COIN</div>
+                        </div>
+                    </div>
 
-            <form onSubmit={handleChat} className={styles.chatForm}>
-                <input
-                    type="text"
-                    value={chatInput}
-                    onChange={(e) => setChatInput(e.target.value)}
-                    placeholder="> Execute transmission..."
-                    className={styles.chatInput}
-                />
-                <button type="submit" className={styles.chatButton}>TX</button>
-            </form>
+                    <div className={styles.hudSide}>
+                        <button className={styles.btnAction} onClick={() => changeRoom('mainframe')}>HUB: MAINFRAME</button>
+                        <button className={styles.btnAction} onClick={() => changeRoom('blackmarket')}>NAV: DARKNET</button>
+                    </div>
+
+                    <div className={styles.chatWrapper}>
+                        <div className={styles.sysLogBox}>
+                            {systemLogs.map((log, i) => <div key={i}>{log}</div>)}
+                        </div>
+                        <form onSubmit={handleChat} className={styles.chatFormLocal}>
+                            <span className={styles.chatPrompt}>LOCAL&gt;</span>
+                            <input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} className={styles.chatInputField} placeholder="Execute broadcast..." />
+                        </form>
+                    </div>
+                </>
+            )}
+
+            {/* ADVENTUREQUEST BATTLE OVERLAY */}
+            {inBattle && battleData && (
+                <div className={styles.battleArena}>
+                    {/* WorldMonitor Map Background Theme */}
+                    <div className={styles.battleBg}></div>
+
+                    <div className={styles.battleField}>
+                        {/* Player Side */}
+                        <div className={styles.combatantPlayer}>
+                            <h3>{battleData.playerDaemon.name} Lv.{battleData.playerDaemon.level} [{battleData.playerDaemon.type}]</h3>
+                            <div className={styles.hpBarContainer}>
+                                <div className={styles.hpBarFill} style={{ width: `${(playerHp / battleData.playerDaemon.hp) * 100}%` }}></div>
+                            </div>
+                            <p>{playerHp} / {battleData.playerDaemon.hp} HP</p>
+                            <div className={styles.spritePlayer}></div>
+                        </div>
+
+                        {/* Enemy Side */}
+                        <div className={styles.combatantEnemy}>
+                            <h3>{battleData.enemy.name} Lv.{battleData.enemy.level} [{battleData.enemy.type}]</h3>
+                            <div className={styles.hpBarContainerEnemy}>
+                                <div className={styles.hpBarFillEnemy} style={{ width: `${(enemyHp / battleData.enemy.hp) * 100}%` }}></div>
+                            </div>
+                            <p>{enemyHp} / {battleData.enemy.hp} HP</p>
+                            <div className={styles.spriteEnemy}></div>
+                        </div>
+                    </div>
+
+                    {/* Combat Log */}
+                    <div className={styles.battleLogBox}>
+                        {battleLog.map((log, i) => <div key={i}>{log}</div>)}
+                    </div>
+
+                    {/* Action Menu (Pokemon/AQ style) */}
+                    <div className={styles.battleMenu}>
+                        <div className={styles.battleMenuGrid}>
+                            <button onClick={() => castMove('EXPLOIT()')} className={styles.moveBtn}>EXPLOIT()</button>
+                            <button onClick={() => castMove('ENCRYPT_PAYLOAD')} className={styles.moveBtn}>ENCRYPT P/LOAD</button>
+                            <button onClick={() => castMove('PING_FLOOD')} className={styles.moveBtn}>PING FLOOD</button>
+                            <button onClick={() => castMove('RUN')} className={styles.moveBtnRun}>TERMINATE CON</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

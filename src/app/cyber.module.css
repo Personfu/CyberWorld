@@ -27,7 +27,7 @@
   pointer-events: none;
 }
 
-.gameContainer {
+.gameWrapper {
   position: absolute;
   top: 0;
   left: 0;
@@ -38,7 +38,8 @@
   background-color: #000;
 }
 
-.gameContainer::after {
+/* OVERWORLD GRID EFFECTS */
+.gameWrapper::after {
   content: "";
   position: absolute;
   top: 0;
@@ -51,72 +52,335 @@
   z-index: 100;
 }
 
-.statsOverlay {
+.hudTop {
   position: absolute;
   top: 20px;
   left: 20px;
-  color: #ff0055;
-  text-shadow: 0 0 5px #ff0055;
-  font-size: 1.5rem;
-  z-index: 200;
-  pointer-events: none;
-  font-weight: bold;
-}
-
-.logContainer {
-  position: absolute;
-  bottom: 60px;
-  left: 20px;
-  width: 400px;
-  max-height: 150px;
-  overflow: hidden;
-  z-index: 200;
+  right: 20px;
   display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
+  justify-content: space-between;
+  z-index: 200;
   pointer-events: none;
 }
 
-.logText {
-  color: #00ffcc;
-  font-size: 0.9rem;
-  text-shadow: 0 0 5px #00ffcc;
-  margin-bottom: 2px;
-  animation: fadeIn 0.3s;
-}
-
-.chatForm {
-  position: absolute;
-  bottom: 20px;
-  left: 20px;
-  z-index: 200;
-  display: flex;
-  width: 400px;
-}
-
-.chatInput {
-  flex-grow: 1;
-  background: rgba(0, 50, 40, 0.5);
+.hudPanel {
+  background: rgba(0, 20, 10, 0.8);
   border: 1px solid #00ffcc;
-  color: #fff;
-  padding: 8px 12px;
-  font-family: inherit;
-  outline: none;
-  font-size: 1rem;
-}
-
-.chatInput:focus {
-  background: rgba(0, 80, 60, 0.8);
+  padding: 10px 20px;
+  color: #00ffcc;
   box-shadow: 0 0 10px #00ffcc;
 }
 
-.chatButton {
+.hudPanel h2 {
+  margin: 0 0 5px 0;
+  font-size: 1.2rem;
+  text-shadow: 0 0 5px #00ffcc;
+}
+
+.hudPanel p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #aaa;
+}
+
+.hudPanelRight {
+  background: rgba(0, 20, 10, 0.8);
+  border: 1px solid #ff0055;
+  padding: 10px 20px;
+  color: #ff0055;
+  text-align: right;
+  box-shadow: 0 0 10px #ff0055;
+  pointer-events: none;
+}
+
+.hlt {
+  color: #fff;
+  font-weight: bold;
+  text-shadow: 0 0 5px #fff;
+}
+
+.hudSide {
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  z-index: 200;
+}
+
+.btnAction {
+  background: rgba(0, 50, 40, 0.8);
+  border: 1px solid #00ffcc;
+  color: #00ffcc;
+  padding: 15px 20px;
+  font-family: inherit;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-shadow: 0 0 5px #00ffcc;
+  box-shadow: 0 0 5px #00ffcc;
+}
+
+.btnAction:hover {
   background: #00ffcc;
   color: #000;
-  border: none;
+  box-shadow: 0 0 15px #00ffcc;
+}
+
+.chatWrapper {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  width: 400px;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+}
+
+.sysLogBox {
+  background: rgba(0, 10, 5, 0.8);
+  border: 1px solid #00ffcc;
+  border-bottom: none;
+  padding: 10px;
+  height: 100px;
+  overflow-y: auto;
+  color: #00ffcc;
+  font-size: 0.8rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.sysLogBox div {
+  margin-bottom: 3px;
+  animation: fadeIn 0.3s;
+}
+
+.chatFormLocal {
+  display: flex;
+  background: rgba(0, 50, 40, 0.9);
+  border: 1px solid #00ffcc;
+  padding: 5px;
+  align-items: center;
+}
+
+.chatPrompt {
+  color: #ff0055;
   font-weight: bold;
-  padding: 0 15px;
+  margin-right: 10px;
+  margin-left: 5px;
+}
+
+.chatInputField {
+  flex-grow: 1;
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-family: inherit;
+  font-size: 1rem;
+  outline: none;
+}
+
+/* -------------------- BATTLE ARENA (A.Q. STYLE) -------------------- */
+.battleArena {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  z-index: 300;
+  background: #000;
+}
+
+/* Incorporate worldmonitor visual element logic: A massive glowing map projection as background */
+.battleBg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(circle at center, rgba(0, 255, 204, 0.1) 0%, rgba(0, 0, 0, 0.9) 80%),
+    repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(0, 255, 204, 0.05) 10px, rgba(0, 255, 204, 0.05) 20px);
+  opacity: 0.6;
+  z-index: -1;
+}
+
+.battleField {
+  flex-grow: 1;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  padding: 50px;
+}
+
+.combatantPlayer,
+.combatantEnemy {
+  width: 300px;
+  background: rgba(0, 20, 10, 0.8);
+  border: 2px solid #00ffcc;
+  padding: 20px;
+  text-align: center;
+  box-shadow: 0 0 20px rgba(0, 255, 204, 0.3);
+}
+
+.combatantEnemy {
+  border-color: #ff0055;
+  box-shadow: 0 0 20px rgba(255, 0, 85, 0.3);
+}
+
+.combatantPlayer h3 {
+  color: #00ffcc;
+  margin: 0 0 10px;
+}
+
+.combatantEnemy h3 {
+  color: #ff0055;
+  margin: 0 0 10px;
+}
+
+/* HP BARS */
+.hpBarContainer,
+.hpBarContainerEnemy {
+  width: 100%;
+  height: 20px;
+  background: #222;
+  border: 1px solid #444;
+  margin-bottom: 5px;
+}
+
+.hpBarFill {
+  height: 100%;
+  background: #00ffcc;
+  transition: width 0.3s ease;
+  box-shadow: 0 0 10px #00ffcc;
+}
+
+.hpBarFillEnemy {
+  height: 100%;
+  background: #ff0055;
+  transition: width 0.3s ease;
+  box-shadow: 0 0 10px #ff0055;
+}
+
+/* SPRITE PLACEHOLDERS */
+.spritePlayer,
+.spriteEnemy {
+  width: 150px;
+  height: 150px;
+  margin: 20px auto 0;
+  border-radius: 5px;
+  background-size: cover;
+}
+
+.spritePlayer {
+  background-image: radial-gradient(circle, rgba(0, 255, 204, 0.5), transparent);
+  border: 1px dashed #00ffcc;
+  animation: floatSprite 3s infinite ease-in-out;
+}
+
+.spriteEnemy {
+  background-image: radial-gradient(circle, rgba(255, 0, 85, 0.5), transparent);
+  border: 1px dashed #ff0055;
+  animation: floatSpriteEnemy 2s infinite ease-in-out;
+}
+
+.battleLogBox {
+  height: 150px;
+  background: rgba(0, 0, 0, 0.9);
+  border-top: 2px solid #555;
+  color: #fff;
+  padding: 20px;
+  font-family: inherit;
+  font-size: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.battleMenu {
+  height: 150px;
+  background: rgba(0, 20, 10, 0.9);
+  border-top: 3px solid #00ffcc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.battleMenuGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  width: 800px;
+}
+
+.moveBtn {
+  background: rgba(0, 255, 204, 0.1);
+  border: 2px solid #00ffcc;
+  color: #00ffcc;
+  padding: 15px;
+  font-family: inherit;
+  font-weight: bold;
+  font-size: 1.2rem;
   cursor: pointer;
+  transition: 0.2s;
+  text-shadow: 0 0 5px #00ffcc;
+}
+
+.moveBtn:hover {
+  background: #00ffcc;
+  color: #000;
+  box-shadow: 0 0 15px #00ffcc;
+}
+
+.moveBtnRun {
+  background: rgba(255, 0, 85, 0.1);
+  border: 2px solid #ff0055;
+  color: #ff0055;
+  padding: 15px;
+  font-family: inherit;
+  font-weight: bold;
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.moveBtnRun:hover {
+  background: #ff0055;
+  color: #000;
+  box-shadow: 0 0 15px #ff0055;
+}
+
+@keyframes floatSprite {
+  0% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-10px);
+  }
+
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes floatSpriteEnemy {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+
+  50% {
+    transform: translateY(-15px) scale(1.05);
+  }
+
+  100% {
+    transform: translateY(0) scale(1);
+  }
 }
 
 @keyframes pulse {
@@ -137,7 +401,7 @@
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(5px);
   }
 
   to {
