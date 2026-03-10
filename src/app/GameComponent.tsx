@@ -167,7 +167,7 @@ export default function GameComponent() {
 
                     if (enemyHp - result.enemyDamageTaken <= 0) {
                         setBattleLog(prev => [...prev.slice(-3), `SCRUBBING COMPLETE. TARGET REMOVED.`]);
-                        setTimeout(() => { setInBattle(false); self.socket.emit('battleEnd', { win: true, enemyLevel: battleData.enemy.level }); }, 1500;
+                        setTimeout(() => { setInBattle(false); self.socket.emit('battleEnd', { win: true, enemyLevel: battleData.enemy.level }); }, 1500);
                     }
                 });
 
