@@ -10,18 +10,29 @@ const port = process.env.PORT || 3000;
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
 
-// Define rooms
+// Define rooms from GDD
 const ROOMS = {
     mainframe: { name: 'THE MAINFRAME', desc: 'Central Cyber-Nexus' },
-    blackmarket: { name: 'DARKNET BAZAAR', desc: 'Illegal scripts and proxies' }
+    lan_valley: { name: 'LAN VALLEY', desc: 'Starting area. ARP, ICMP, basic scanning.' },
+    packet_plains: { name: 'PACKET PLAINS', desc: 'Wireshark, protocol fuzzing.' },
+    wireless_woods: { name: 'WIRELESS WOODS', desc: 'WiFi / BLE hunting. probe requests.' },
+    wan_wasteland: { name: 'WAN WASTELAND', desc: 'BGP hijacking, routing exploits.' },
+    darknet_depths: { name: 'DARKNET DEPTHS', desc: 'Tor-style anonymity, .onion' },
+    cloud_citadel: { name: 'CLOUD CITADEL', desc: 'AWS, Azure, container escapes.' },
+    zero_day_peaks: { name: 'ZERO-DAY PEAKS', desc: '0-days, APTs, kernel exploits.' }
 };
 
-// Daemons Database
-const DAEMONS = [
-    { name: 'Ping', type: 'Network', hp: 35, atk: 55, def: 40 },
-    { name: 'XSSling', type: 'Web', hp: 38, atk: 60, def: 35 },
-    { name: 'Stacksmash', type: 'Binary', hp: 40, atk: 90, def: 30 },
-    { name: 'Hashling', type: 'Crypto', hp: 40, atk: 50, def: 45 }
+// Daemons Database (Subset for now)
+const DAEMON_TYPES = [
+    { name: 'Ping', type: 'Network', hp: 35, atk: 55, def: 40, spd: 90 },
+    { name: 'Tracert', type: 'Network', hp: 55, atk: 70, def: 55, spd: 75 },
+    { name: 'Nmap', type: 'Network', hp: 80, atk: 95, def: 70, spd: 60 },
+    { name: 'XSSling', type: 'Web', hp: 38, atk: 60, def: 35, spd: 75 },
+    { name: 'Stacksmash', type: 'Binary', hp: 40, atk: 90, def: 30, spd: 70 },
+    { name: 'Hashling', type: 'Crypto', hp: 40, atk: 50, def: 45, spd: 55 },
+    { name: 'Probe', type: 'Wireless', hp: 35, atk: 45, def: 35, spd: 85 },
+    { name: 'Rubberduck', type: 'Physical', hp: 42, atk: 70, def: 35, spd: 75 },
+    { name: 'ZeroDawn', type: 'Zero-Day', hp: 120, atk: 130, def: 90, spd: 95 }
 ];
 
 app.prepare().then(() => {
@@ -43,52 +54,52 @@ app.prepare().then(() => {
     let daemonIdCounter = 0;
 
     function spawnDaemon(room) {
-        const dType = DAEMONS[Math.floor(Math.random() * DAEMONS.length)];
+        const dType = DAEMON_TYPES[Math.floor(Math.random() * DAEMON_TYPES.length)];
         const id = 'daemon_' + (daemonIdCounter++);
         wildDaemons[id] = {
             id: id,
             name: dType.name,
             type: dType.type,
             room: room,
-            x: 100 + Math.floor(Math.random() * 600),
+            x: 100 + Math.floor(Math.random() * 800),
             y: 100 + Math.floor(Math.random() * 400),
             hp: dType.hp,
             maxHp: dType.hp,
             atk: dType.atk,
             def: dType.def,
-            level: Math.floor(Math.random() * 5) + 1
+            spd: dType.spd,
+            level: Math.floor(Math.random() * 10) + 1
         };
         io.to(room).emit('spawnDaemon', wildDaemons[id]);
     }
 
-    // Spawn initial daemons
-    for (let i = 0; i < 5; i++) spawnDaemon('mainframe');
-    for (let i = 0; i < 5; i++) spawnDaemon('blackmarket');
+    // Spawn initial daemons in all rooms
+    Object.keys(ROOMS).forEach(room => {
+        for (let i = 0; i < 3; i++) spawnDaemon(room);
+    });
 
     setInterval(() => {
-        if (Object.keys(wildDaemons).length < 20) {
-            spawnDaemon(Math.random() > 0.5 ? 'mainframe' : 'blackmarket');
+        const roomIds = Object.keys(ROOMS);
+        const targetRoom = roomIds[Math.floor(Math.random() * roomIds.length)];
+        if (Object.values(wildDaemons).filter(d => d.room === targetRoom).length < 5) {
+            spawnDaemon(targetRoom);
         }
-    }, 15000);
+    }, 10000);
 
     io.on('connection', (socket) => {
-        console.log(`Connection established: [ID: ${socket.id}]`);
-
         players[socket.id] = {
             playerId: socket.id,
             name: 'Hacker_' + Math.floor(Math.random() * 9999),
             x: 400, y: 300,
-            room: 'mainframe',
-            targetX: null, targetY: null,
+            room: 'lan_valley',
             level: 1, credits: 0,
             color: Math.floor(Math.random() * 16777215).toString(16),
-            party: [{ ...DAEMONS[Math.floor(Math.random() * 3)], level: 5 }], // Give a starter
+            party: [{ ...DAEMON_TYPES[0], level: 5, currentHp: 35 }], // Starting with Ping
             inBattle: false
         };
 
         socket.join(players[socket.id].room);
 
-        // Send current room state
         socket.emit('joinedRoom', {
             roomDetails: ROOMS[players[socket.id].room],
             players: getPlayersInRoom(players[socket.id].room),
@@ -96,12 +107,12 @@ app.prepare().then(() => {
         });
 
         socket.to(players[socket.id].room).emit('newPlayer', players[socket.id]);
-        socket.emit('systemMessage', { msg: `Welcome to the CyberWorld, ${players[socket.id].name}.` });
+        socket.emit('systemMessage', { msg: `Welcome to CyberWorld. Your journey begins in LAN Valley.` });
 
         socket.on('disconnect', () => {
             const room = players[socket.id] ? players[socket.id].room : null;
-            delete players[socket.id];
             if (room) io.to(room).emit('disconnectPlayer', socket.id);
+            delete players[socket.id];
         });
 
         socket.on('chatMessage', (msg) => {
@@ -111,22 +122,22 @@ app.prepare().then(() => {
         });
 
         socket.on('playerMoveTarget', function (data) {
-            if (!players[socket.id] || players[socket.id].inBattle) return;
-            players[socket.id].targetX = data.x;
-            players[socket.id].targetY = data.y;
-            socket.to(players[socket.id].room).emit('playerMoving', {
+            const p = players[socket.id];
+            if (!p || p.inBattle) return;
+            p.x = data.x; p.y = data.y; // Sync position estimate
+            socket.to(p.room).emit('playerMoving', {
                 playerId: socket.id, targetX: data.x, targetY: data.y, startX: data.startX, startY: data.startY
             });
         });
 
         socket.on('changeRoom', function (newRoom) {
-            if (!players[socket.id] || !ROOMS[newRoom] || players[socket.id].inBattle) return;
-            const oldRoom = players[socket.id].room;
-            socket.leave(oldRoom);
-            socket.to(oldRoom).emit('disconnectPlayer', socket.id);
+            const p = players[socket.id];
+            if (!p || !ROOMS[newRoom] || p.inBattle) return;
+            socket.leave(p.room);
+            socket.to(p.room).emit('disconnectPlayer', socket.id);
 
-            players[socket.id].room = newRoom;
-            players[socket.id].x = 400; players[socket.id].y = 300;
+            p.room = newRoom;
+            p.x = 400; p.y = 300;
 
             socket.join(newRoom);
             socket.emit('joinedRoom', {
@@ -134,17 +145,16 @@ app.prepare().then(() => {
                 players: getPlayersInRoom(newRoom),
                 daemons: getDaemonsInRoom(newRoom)
             });
-            socket.to(newRoom).emit('newPlayer', players[socket.id]);
+            socket.to(newRoom).emit('newPlayer', p);
         });
 
-        // Battle System
         socket.on('initiateBattle', (daemonId) => {
             const p = players[socket.id];
             if (!p || p.inBattle || !wildDaemons[daemonId] || wildDaemons[daemonId].room !== p.room) return;
 
             p.inBattle = true;
             const enemy = wildDaemons[daemonId];
-            delete wildDaemons[daemonId]; // Remove from overworld
+            delete wildDaemons[daemonId];
             io.to(p.room).emit('removeDaemon', daemonId);
 
             socket.emit('battleStart', {
@@ -157,11 +167,28 @@ app.prepare().then(() => {
             const p = players[socket.id];
             if (!p || !p.inBattle) return;
 
-            // Simplistic battle simulation for now (turn-based resolve instantly)
+            // Turn logic: Fast spd hits first
+            const pDaemon = p.party[0];
+            const enemy = actionData.enemyState; // UI sends back enemy as it knows it
+
+            let log = "";
+            let eDmg = 0;
+            let pDmg = 0;
+
+            if (actionData.move === 'RUN') {
+                p.inBattle = false;
+                socket.emit('battleResult', { type: 'fled' });
+                return;
+            }
+
+            // Simulating damage
+            eDmg = Math.floor(Math.random() * (pDaemon.atk / 2)) + 5;
+            pDmg = Math.floor(Math.random() * (enemy.atk / 3)) + 2;
+
             socket.emit('battleTurnResult', {
-                log: `[SysLog] Executing action: ${actionData.move}`,
-                enemyDamageTaken: Math.floor(Math.random() * 20) + 5,
-                playerDamageTaken: Math.floor(Math.random() * 15) + 2
+                log: `[SysLog] Executing ${actionData.move}. Target Vun. Established.`,
+                enemyDamageTaken: eDmg,
+                playerDamageTaken: pDmg
             });
         });
 
@@ -170,9 +197,10 @@ app.prepare().then(() => {
             if (!p) return;
             p.inBattle = false;
             if (data.win) {
-                p.credits += 50;
-                socket.emit('systemMessage', { msg: `Daemon Defeated. +50 CyberCredits` });
+                const reward = 50 + (data.enemyLevel * 10);
+                p.credits += reward;
                 socket.emit('updateStats', { credits: p.credits, level: p.level });
+                socket.emit('systemMessage', { msg: `Daemon Scrubbed. +${reward} Credits.` });
             }
         });
 
