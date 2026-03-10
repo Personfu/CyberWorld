@@ -1,9 +1,11 @@
 'use client';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Game } from 'phaser';
+import styles from './cyber.module.css';
 
 export default function GameComponent() {
     const gameRef = useRef<Game | null>(null);
+    const [score, setScore] = useState(0);
 
     useEffect(() => {
         async function initPhaser() {
@@ -13,8 +15,9 @@ export default function GameComponent() {
             const config: Phaser.Types.Core.GameConfig = {
                 type: Phaser.AUTO,
                 parent: 'phaser-game',
-                width: 800,
+                width: 1000,
                 height: 600,
+                backgroundColor: '#050505',
                 physics: {
                     default: 'arcade',
                     arcade: {
@@ -34,21 +37,56 @@ export default function GameComponent() {
             }
 
             function preload(this: Phaser.Scene) {
-                // load assets here, drawing shapes for now
+                // We will generate textures programmatically for that true cyberpunk feel
             }
 
             function create(this: Phaser.Scene) {
                 const self = this as any;
                 self.socket = io();
-                self.otherPlayers = self.physics.add.group();
+
+                // Cyber Grid Background
+                const gridGraphics = self.add.graphics();
+                gridGraphics.lineStyle(2, 0x00ffcc, 0.1);
+                for (let i = 0; i < 3000; i += 50) {
+                    gridGraphics.moveTo(-1000, i - 1000);
+                    gridGraphics.lineTo(2000, i - 1000);
+                    gridGraphics.moveTo(i - 1000, -1000);
+                    gridGraphics.lineTo(i - 1000, 2000);
+                }
+                gridGraphics.strokePath();
+
+                self.otherPlayers = self.add.group();
+                self.dataNodes = self.add.group();
 
                 self.socket.on('currentPlayers', (players: any) => {
                     Object.keys(players).forEach((id) => {
                         if (players[id].playerId === self.socket.id) {
                             addPlayer(self, players[id]);
+                            setScore(players[id].score);
                         } else {
                             addOtherPlayers(self, players[id]);
                         }
+                    });
+                });
+
+                self.socket.on('dataNodes', (nodes: any) => {
+                    self.dataNodes.clear(true, true);
+                    Object.keys(nodes).forEach((id) => {
+                        const node = nodes[id];
+                        const n = self.add.circle(node.x, node.y, 8, 0xff0055);
+                        n.nodeId = node.id;
+                        self.physics.add.existing(n);
+                        self.dataNodes.add(n);
+                        // Pulsing tween
+                        self.tweens.add({
+                            targets: n,
+                            scaleX: 1.5,
+                            scaleY: 1.5,
+                            alpha: 0.5,
+                            duration: 500,
+                            yoyo: true,
+                            repeat: -1
+                        });
                     });
                 });
 
@@ -68,21 +106,58 @@ export default function GameComponent() {
                     self.otherPlayers.getChildren().forEach((otherPlayer: any) => {
                         if (playerInfo.playerId === otherPlayer.playerId) {
                             otherPlayer.setPosition(playerInfo.x, playerInfo.y);
+                            otherPlayer.setRotation(playerInfo.rotation);
                         }
                     });
                 });
 
+                self.socket.on('nodeCollected', (data: any) => {
+                    self.dataNodes.getChildren().forEach((n: any) => {
+                        if (n.nodeId === data.nodeId) {
+                            // Explosion effect
+                            const particles = self.add.particles(n.x, n.y, 'flare', {
+                                speed: { min: -100, max: 100 },
+                                angle: { min: 0, max: 360 },
+                                scale: { start: 1, end: 0 },
+                                blendMode: 'ADD',
+                                active: true,
+                                lifespan: 300,
+                                gravityY: 0
+                            });
+                            n.destroy();
+                        }
+                    });
+                    if (data.playerId === self.socket.id) {
+                        setScore(data.newScore);
+                    }
+                });
+
                 self.cursors = self.input.keyboard.createCursorKeys();
+                self.wKey = self.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W);
+                self.aKey = self.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
+                self.sKey = self.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S);
+                self.dKey = self.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
             }
 
             function addPlayer(self: any, playerInfo: any) {
-                self.ship = self.add.rectangle(playerInfo.x, playerInfo.y, 40, 40, playerInfo.team === 'blue' ? 0x0000ff : 0xff0000);
+                // Player is a neon triangle indicating direction
+                self.ship = self.add.triangle(playerInfo.x, playerInfo.y, 0, -20, -15, 15, 15, 15, playerInfo.faction === 'cyber' ? 0x00ffcc : 0xff00ff);
                 self.physics.add.existing(self.ship);
-                self.ship.setOrigin(0.5, 0.5);
+                self.ship.body.setDrag(100);
+                self.ship.body.setAngularDrag(100);
+                self.ship.body.setMaxVelocity(400);
+
+                self.cameras.main.startFollow(self.ship);
+
+                // Setup collision with nodes
+                self.physics.add.overlap(self.ship, self.dataNodes, (ship: any, node: any) => {
+                    self.socket.emit('collectNode', node.nodeId);
+                    node.destroy();
+                }, undefined, self);
             }
 
             function addOtherPlayers(self: any, playerInfo: any) {
-                const otherPlayer = self.add.rectangle(playerInfo.x, playerInfo.y, 40, 40, playerInfo.team === 'blue' ? 0x0000ff : 0xff0000);
+                const otherPlayer = self.add.triangle(playerInfo.x, playerInfo.y, 0, -20, -15, 15, 15, 15, playerInfo.faction === 'cyber' ? 0x00ffcc : 0xff00ff);
                 self.physics.add.existing(otherPlayer);
                 otherPlayer.setOrigin(0.5, 0.5);
                 otherPlayer.playerId = playerInfo.playerId;
@@ -92,32 +167,42 @@ export default function GameComponent() {
             function update(this: Phaser.Scene) {
                 const self = this as any;
                 if (self.ship) {
-                    if (self.cursors.left.isDown) {
-                        self.ship.body.setVelocityX(-200);
-                    } else if (self.cursors.right.isDown) {
-                        self.ship.body.setVelocityX(200);
+
+                    // Mouse rotation
+                    const pointer = self.input.activePointer;
+                    // Calculate angle from center of screen to mouse (since camera follows ship)
+                    const angle = Phaser.Math.Angle.Between(
+                        self.cameras.main.centerX,
+                        self.cameras.main.centerY,
+                        pointer.x,
+                        pointer.y
+                    );
+
+                    // Adjust to point triangle top towards mouse (triangle default looks UP (-90 deg), math.angle is right (0 deg))
+                    self.ship.rotation = angle + Math.PI / 2;
+
+                    if (self.wKey.isDown || self.cursors.up.isDown) {
+                        self.physics.velocityFromRotation(angle, 350, self.ship.body.velocity);
+                    } else if (self.sKey.isDown || self.cursors.down.isDown) {
+                        self.physics.velocityFromRotation(angle, -150, self.ship.body.velocity);
                     } else {
-                        self.ship.body.setVelocityX(0);
+                        self.ship.body.setAcceleration(0);
+                        self.ship.body.setDrag(500); // Stop when no keys pressed
                     }
 
-                    if (self.cursors.up.isDown) {
-                        self.ship.body.setVelocityY(-200);
-                    } else if (self.cursors.down.isDown) {
-                        self.ship.body.setVelocityY(200);
-                    } else {
-                        self.ship.body.setVelocityY(0);
-                    }
-
+                    // Sync
                     const x = self.ship.x;
                     const y = self.ship.y;
+                    const r = self.ship.rotation;
 
-                    if (self.ship.oldPosition && (x !== self.ship.oldPosition.x || y !== self.ship.oldPosition.y)) {
-                        self.socket.emit('playerMovement', { x: self.ship.x, y: self.ship.y });
+                    if (self.ship.oldPosition && (x !== self.ship.oldPosition.x || y !== self.ship.oldPosition.y || r !== self.ship.oldPosition.rotation)) {
+                        self.socket.emit('playerMovement', { x: self.ship.x, y: self.ship.y, rotation: self.ship.rotation });
                     }
 
                     self.ship.oldPosition = {
                         x: self.ship.x,
-                        y: self.ship.y
+                        y: self.ship.y,
+                        rotation: self.ship.rotation
                     };
                 }
             }
@@ -134,9 +219,11 @@ export default function GameComponent() {
     }, []);
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <h1 style={{ fontFamily: 'monospace', color: '#0f0', textShadow: '0 0 5px #0f0' }}>CYBERWORLD TERMINAL</h1>
-            <div id="phaser-game" style={{ border: '2px solid #0f0', boxShadow: '0 0 10px #0f0' }}></div>
+        <div style={{ position: 'relative' }}>
+            <div id="phaser-game"></div>
+            <div className={styles.statsOverlay}>
+                CYBER_CREDITS: [{score}]
+            </div>
         </div>
     );
 }

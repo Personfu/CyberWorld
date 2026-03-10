@@ -1,4 +1,6 @@
 import * as React from 'react';
+import styles from './cyber.module.css';
+
 export default function Page() {
   const [GameComponent, setGameComponent] = React.useState<any>(null);
 
@@ -9,8 +11,11 @@ export default function Page() {
   }, []);
 
   return (
-    <main style={{ backgroundColor: '#000', color: '#0f0', width: '100vw', height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-      {GameComponent ? <GameComponent /> : <p>Loading CyberWorld Terminal...</p>}
+    <main className={styles.container}>
+      <h1 className={styles.terminalHeader}>CYBERWORLD TERMINAL</h1>
+      <div className={styles.gameContainer}>
+        {GameComponent ? <GameComponent /> : <p>INITIALIZING LINK...</p>}
+      </div>
     </main>
   );
 }

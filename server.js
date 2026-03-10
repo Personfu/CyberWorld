@@ -25,22 +25,40 @@ app.prepare().then(() => {
     const io = new Server(server);
 
     const players = {};
+    const dataNodes = {};
+
+    // Spawn initial nodes
+    for (let i = 0; i < 5; i++) {
+        const nodeId = 'node_' + Math.random().toString(36).substr(2, 9);
+        dataNodes[nodeId] = {
+            id: nodeId,
+            x: Math.floor(Math.random() * 2000) - 1000,
+            y: Math.floor(Math.random() * 2000) - 1000,
+            value: Math.floor(Math.random() * 50) + 10
+        };
+    }
 
     io.on('connection', (socket) => {
-        console.log(`Player connected: ${socket.id}`);
+        console.log(`Connection established: [ID: ${socket.id}]`);
 
         players[socket.id] = {
-            x: Math.floor(Math.random() * 700) + 50,
-            y: Math.floor(Math.random() * 500) + 50,
             playerId: socket.id,
-            team: (Math.floor(Math.random() * 2) == 0) ? 'red' : 'blue'
+            x: Math.floor(Math.random() * 400) - 200,
+            y: Math.floor(Math.random() * 400) - 200,
+            rotation: 0,
+            score: 0,
+            faction: (Math.random() > 0.5) ? 'cyber' : 'neon'
         };
 
+        // Send current state
         socket.emit('currentPlayers', players);
+        socket.emit('dataNodes', dataNodes);
+
+        // Notify others
         socket.broadcast.emit('newPlayer', players[socket.id]);
 
         socket.on('disconnect', () => {
-            console.log(`Player disconnected: ${socket.id}`);
+            console.log(`Connection lost: [ID: ${socket.id}]`);
             delete players[socket.id];
             io.emit('disconnectPlayer', socket.id);
         });
@@ -48,7 +66,30 @@ app.prepare().then(() => {
         socket.on('playerMovement', function (movementData) {
             players[socket.id].x = movementData.x;
             players[socket.id].y = movementData.y;
+            players[socket.id].rotation = movementData.rotation;
             socket.broadcast.emit('playerMoved', players[socket.id]);
+        });
+
+        socket.on('collectNode', function (nodeId) {
+            if (dataNodes[nodeId]) {
+                const val = dataNodes[nodeId].value;
+                players[socket.id].score += val;
+                delete dataNodes[nodeId];
+
+                io.emit('nodeCollected', { playerId: socket.id, nodeId: nodeId, newScore: players[socket.id].score });
+
+                // Respawn a new node
+                setTimeout(() => {
+                    const newId = 'node_' + Math.random().toString(36).substr(2, 9);
+                    dataNodes[newId] = {
+                        id: newId,
+                        x: Math.floor(Math.random() * 2000) - 1000,
+                        y: Math.floor(Math.random() * 2000) - 1000,
+                        value: Math.floor(Math.random() * 80) + 20
+                    };
+                    io.emit('dataNodes', dataNodes); // Or just a newNode event
+                }, 3000);
+            }
         });
     });
 
@@ -58,6 +99,6 @@ app.prepare().then(() => {
     });
 
     server.listen(port, () => {
-        console.log(`> CyberWorld MMORPG ready on http://${hostname}:${port}`);
+        console.log(`> CyberWorld Simulation Engine Online - Port ${port}`);
     });
 });
