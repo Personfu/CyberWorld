@@ -1,8 +1,13 @@
 'use client';
 import * as React from 'react';
+import dynamic from 'next/dynamic';
+
+const CyberWorldEngine = dynamic(() => import('@/components/game/Engine'), {
+    ssr: false,
+    loading: () => <p style={{fontFamily: 'var(--font-vt323)', fontSize: '24px', color: 'var(--cyber-cyan)'}}>INITIALIZING LINK...</p>
+});
 
 export default function Page() {
-  const [GameComponent, setGameComponent] = React.useState<any>(null);
   const [isPlaying, setIsPlaying] = React.useState(false);
   const [time, setTime] = React.useState('12:00 PM');
   
@@ -14,10 +19,6 @@ export default function Page() {
   const chatBottomRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
-    import('./GameComponent').then((mod) => {
-      setGameComponent(() => mod.default);
-    });
-    
     const interval = setInterval(() => {
       const now = new Date();
       setTime(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
@@ -93,7 +94,7 @@ export default function Page() {
                       {!isPlaying ? (
                           <button className="btn-play" onClick={handlePlayClick}>PLAY NOW</button>
                       ) : (
-                          GameComponent ? <GameComponent /> : <p style={{fontFamily: 'var(--font-vt323)', fontSize: '24px', color: 'var(--cyber-cyan)'}}>INITIALIZING LINK...</p>
+                          <CyberWorldEngine />
                       )}
                   </div>
 
