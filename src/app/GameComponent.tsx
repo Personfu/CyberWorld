@@ -36,8 +36,12 @@ export default function GameComponent() {
             const config: Phaser.Types.Core.GameConfig = {
                 type: Phaser.AUTO,
                 parent: 'phaser-game',
-                width: typeof window !== 'undefined' ? window.innerWidth : 1000,
-                height: typeof window !== 'undefined' ? window.innerHeight : 600,
+                scale: {
+                    mode: Phaser.Scale.RESIZE,
+                    parent: 'phaser-game',
+                    width: '100%',
+                    height: '100%',
+                },
                 backgroundColor: '#050505',
                 physics: { default: 'arcade', arcade: { debug: false } },
                 scene: { preload: preload, create: create, update: update }
