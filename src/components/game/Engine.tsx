@@ -31,7 +31,8 @@ export default function GameComponent() {
     useEffect(() => {
         async function initPhaser() {
             const Phaser = (await import('phaser')).default;
-            const { io } = await import('socket.io-client');
+            const { Client } = await import('colyseus.js');
+            const { createClient } = await import('@supabase/supabase-js');
 
             const config: Phaser.Types.Core.GameConfig = {
                 type: Phaser.AUTO,
@@ -78,125 +79,131 @@ export default function GameComponent() {
 
             function create(this: Phaser.Scene) {
                 const self = this as any;
-                self.socket = io({ transports: ['websocket', 'polling'] });
-                socketRef.current = self.socket;
+                const colyseus = new Client(process.env.NEXT_PUBLIC_COLYSEUS_URL || 'wss://fllc.net:2567');
+                const supabase = createClient(
+                    process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://friptophbkiglomvabmf.supabase.co', 
+                    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'dummy_key'
+                );
 
                 self.otherPlayers = self.physics.add.group();
                 self.wildDaemons = self.physics.add.group();
                 self.chatBubbles = {};
                 self.activeTweens = {};
 
+                supabase.auth.getSession().then(({ data }) => {
+                    const token = data.session?.access_token || '';
+                    colyseus.joinOrCreate('cyber_room', { token }).then(room => {
+                        self.room = room;
+                        socketRef.current = room;
+
+                        room.state.players.onAdd((player: any, sessionId: string) => {
+                            if (sessionId === room.sessionId) {
+                                addPlayer(self, { x: player.x, y: player.y, level: player.level || 1, name: player.name || 'Agent', color: '0x00ffcc', playerId: sessionId, credits: 0 });
+                            } else {
+                                addOtherPlayers(self, { x: player.x, y: player.y, name: player.name || 'Agent', color: '0xff00cc', playerId: sessionId });
+                            }
+
+                            player.onChange(() => {
+                                if (sessionId !== room.sessionId) {
+                                    self.otherPlayers.getChildren().forEach((p: any) => {
+                                        if (p.playerId === sessionId) startMoveCoroutine(self, p, player.x, player.y);
+                                    });
+                                }
+                            });
+                        });
+
+                        room.state.players.onRemove((player: any, sessionId: string) => {
+                            self.otherPlayers.getChildren().forEach((p: any) => {
+                                if (p.playerId === sessionId) { p.destroy(); if (p.nameTag) p.nameTag.destroy(); if (self.chatBubbles[sessionId]) self.chatBubbles[sessionId].destroy(); }
+                            });
+                        });
+
+                        room.state.enemies.onAdd((daemon: any, id: string) => {
+                            spawnDaemon(self, { id, x: daemon.x, y: daemon.y, name: daemon.name, level: daemon.level });
+                        });
+
+                        room.state.enemies.onRemove((daemon: any, id: string) => {
+                            self.wildDaemons.getChildren().forEach((d: any) => {
+                                if (d.daemonId === id) { d.destroy(); if (d.nameTag) d.nameTag.destroy(); }
+                            });
+                        });
+
+                        room.onMessage('systemMessage', (msg: any) => addSysLog(msg.msg || msg));
+                        room.onMessage('roomInfo', (data: any) => {
+                            setRoomInfo(data);
+                            addSysLog(`NAV_LINK: ESTABLISHED [${data.name}]`);
+                        });
+                        room.onMessage('chatMessage', (data: any) => {
+                            const id = data.senderId;
+                            let target = (id === room.sessionId) ? self.player : null;
+                            if (!target) self.otherPlayers.getChildren().forEach((p: any) => { if (p.playerId === id) target = p; });
+                            if (target) {
+                                if (self.chatBubbles[id]) self.chatBubbles[id].destroy();
+                                const bubble = self.add.text(target.x, target.y - 65, data.msg, {
+                                    backgroundColor: 'rgba(0,0,0,0.85)', padding: { x: 10, y: 6 }, color: '#00ffcc', fontSize: '14px', borderThickness: 1, wordWrap: { width: 180 }
+                                }).setOrigin(0.5, 1);
+                                self.chatBubbles[id] = bubble;
+                                self.time.delayedCall(4000, () => { if (bubble && bubble.active) bubble.destroy(); });
+                            }
+                        });
+
+                        room.onMessage('battleStart', (data: any) => {
+                            setInBattle(true);
+                            setBattleData(data);
+                            setPlayerHp(data.playerDaemon?.hp || 100);
+                            setEnemyHp(data.enemy?.hp || 100);
+                            setBattleLog([`DETECTED: [${data.enemy?.name}] (${data.enemy?.type})`, `UPLINK GO...`]);
+                            addSysLog(`ENGAGING THREAT: ${data.enemy?.name}`);
+                        });
+
+                        room.onMessage('battleTurnResult', (result: any) => {
+                            setBattleLog(prev => [...prev.slice(-3), result.log]);
+                            setEnemyHp(prev => Math.max(0, prev - result.enemyDamageTaken));
+                            setPlayerHp(prev => Math.max(0, prev - result.playerDamageTaken));
+
+                            if (enemyHp - result.enemyDamageTaken <= 0) {
+                                setBattleLog(prev => [...prev.slice(-3), `SCRUBBING COMPLETE.`]);
+                                setTimeout(() => { setInBattle(false); }, 1500);
+                            }
+                        });
+
+                        room.onMessage('updateStats', (data: any) => { setScore(data.credits); setLevel(data.level); });
+                        room.onMessage('evolutionTrigger', (data: any) => {
+                            setEvolving(data);
+                            addSysLog(`CRITICAL: DAEMON IS RECONSTRUCTING...`);
+                            setTimeout(() => setEvolving(null), 5000);
+                        });
+                        room.onMessage('receiveItem', (item: any) => {
+                            setInventory(prev => [...prev, item]);
+                            addSysLog(`ITEM_ACQUIRED: ${item.name}`);
+                        });
+
+                    }).catch(e => {
+                        console.error('Colyseus Join Error:', e);
+                        addSysLog(`UPLINK FAILURE: ${e.message}`);
+                    });
+                });
+
                 self.grid = self.add.graphics();
                 window.addEventListener('resize', () => drawGrid(self));
                 drawGrid(self);
 
-                // Input
                 self.input.on('pointerdown', (pointer: any) => {
-                    if (!self.player || inBattle) return;
-
-                    // Interaction Check (Target Daemons or NPCs)
+                    if (!self.player || inBattle || !self.room) return;
+                    
                     let clickedDaemon = null;
                     self.wildDaemons.getChildren().forEach((d: any) => {
                         if (d.getBounds().contains(pointer.worldX, pointer.worldY)) { clickedDaemon = d.daemonId; }
                     });
 
                     if (clickedDaemon) {
-                        self.socket.emit('initiateBattle', clickedDaemon);
+                        self.room.send('attack', { target: clickedDaemon });
                         return;
                     }
 
-                    const targetX = pointer.worldX;
-                    const targetY = pointer.worldY;
-
-                    startMoveCoroutine(self, self.player, targetX, targetY);
-                    self.socket.emit('playerMoveTarget', { x: targetX, y: targetY, startX: self.player.x, startY: self.player.y });
-                });
-
-                self.socket.on('joinedRoom', (data: any) => {
-                    setRoomInfo(data.roomDetails);
-                    self.otherPlayers.clear(true, true);
-                    self.wildDaemons.clear(true, true);
-
-                    Object.keys(data.players).forEach(id => {
-                        if (id === self.socket.id) addPlayer(self, data.players[id]);
-                        else addOtherPlayers(self, data.players[id]);
-                    });
-
-                    Object.keys(data.daemons).forEach(id => spawnDaemon(self, data.daemons[id]));
-                    addSysLog(`NAV_LINK: ESTABLISHED [${data.roomDetails.name}]`);
-                });
-
-                self.socket.on('spawnDaemon', (dData: any) => spawnDaemon(self, dData));
-
-                self.socket.on('removeDaemon', (dId: string) => {
-                    self.wildDaemons.getChildren().forEach((d: any) => {
-                        if (d.daemonId === dId) { d.destroy(); if (d.nameTag) d.nameTag.destroy(); }
-                    });
-                });
-
-                self.socket.on('newPlayer', (playerInfo: any) => addOtherPlayers(self, playerInfo));
-
-                self.socket.on('disconnectPlayer', (id: string) => {
-                    self.otherPlayers.getChildren().forEach((p: any) => {
-                        if (p.playerId === id) { p.destroy(); if (p.nameTag) p.nameTag.destroy(); if (self.chatBubbles[id]) self.chatBubbles[id].destroy(); }
-                    });
-                });
-
-                self.socket.on('playerMoving', (data: any) => {
-                    self.otherPlayers.getChildren().forEach((p: any) => {
-                        if (p.playerId === data.playerId) { p.setPosition(data.startX, data.startY); startMoveCoroutine(self, p, data.targetX, data.targetY); }
-                    });
-                });
-
-                self.socket.on('chatMessage', (data: any) => {
-                    const id = data.senderId;
-                    let target = (id === self.socket.id) ? self.player : null;
-                    if (!target) self.otherPlayers.getChildren().forEach((p: any) => { if (p.playerId === id) target = p; });
-
-                    if (target) {
-                        if (self.chatBubbles[id]) self.chatBubbles[id].destroy();
-                        const bubble = self.add.text(target.x, target.y - 65, data.msg, {
-                            backgroundColor: 'rgba(0,0,0,0.85)', padding: { x: 10, y: 6 },
-                            color: '#00ffcc', fontSize: '14px', borderColor: '#00ffcc',
-                            borderThickness: 1, wordWrap: { width: 180 }
-                        }).setOrigin(0.5, 1);
-                        self.chatBubbles[id] = bubble;
-                        self.time.delayedCall(4000, () => { if (bubble && bubble.active) bubble.destroy(); });
-                    }
-                });
-
-                self.socket.on('battleStart', (data: any) => {
-                    setInBattle(true);
-                    setBattleData(data);
-                    setPlayerHp(data.playerDaemon.hp);
-                    setEnemyHp(data.enemy.hp);
-                    setBattleLog([`DETECTED: [${data.enemy.name}] (${data.enemy.type})`, `UPLINK GO, [${data.playerDaemon.name}]!`]);
-                    addSysLog(`ENGAGING THREAT: ${data.enemy.name}`);
-                });
-
-                self.socket.on('battleTurnResult', (result: any) => {
-                    setBattleLog(prev => [...prev.slice(-3), result.log]);
-                    setEnemyHp(prev => Math.max(0, prev - result.enemyDamageTaken));
-                    setPlayerHp(prev => Math.max(0, prev - result.playerDamageTaken));
-
-                    if (enemyHp - result.enemyDamageTaken <= 0) {
-                        setBattleLog(prev => [...prev.slice(-3), `SCRUBBING COMPLETE. TARGET REMOVED.`]);
-                        setTimeout(() => { setInBattle(false); self.socket.emit('battleEnd', { win: true, enemyLevel: battleData.enemy.level }); }, 1500);
-                    }
-                });
-
-                self.socket.on('systemMessage', (data: any) => addSysLog(data.msg));
-                self.socket.on('updateStats', (data: any) => { setScore(data.credits); setLevel(data.level); });
-
-                self.socket.on('evolutionTrigger', (data: any) => {
-                    setEvolving(data);
-                    addSysLog(`CRITICAL: DAEMON [${data.oldName}] IS RECONSTRUCTING...`);
-                    setTimeout(() => setEvolving(null), 5000);
-                });
-
-                self.socket.on('receiveItem', (item: any) => {
-                    setInventory(prev => [...prev, item]);
-                    addSysLog(`ITEM_ACQUIRED: ${item.name}`);
+                    const tx = pointer.worldX; const ty = pointer.worldY;
+                    startMoveCoroutine(self, self.player, tx, ty);
+                    self.room.send('move', { x: tx, y: ty });
                 });
             }
 
@@ -257,8 +264,8 @@ export default function GameComponent() {
         return () => { if (gameRef.current) { gameRef.current.destroy(true); gameRef.current = null; } };
     }, []);
 
-    const changeRoom = (newRoom: string) => { if (socketRef.current) socketRef.current.emit('changeRoom', newRoom); };
-    const castMove = (move: string) => { if (socketRef.current && inBattle) socketRef.current.emit('battleAction', { move, enemyState: battleData.enemy }); };
+    const changeRoom = (newRoom: string) => { if (socketRef.current) socketRef.current.send('changeRoom', newRoom); };
+    const castMove = (move: string) => { if (socketRef.current && inBattle) socketRef.current.send('battleAction', { move, enemyState: battleData.enemy }); };
 
     return (
         <div className={styles.gameWrapper}>
@@ -296,7 +303,7 @@ export default function GameComponent() {
                             <span className={styles.chatPrompt}>UPLINK&gt;</span>
                             <input type="text" className={styles.chatInputField} placeholder="execute broadcast..." onKeyDown={e => {
                                 if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-                                    socketRef.current.emit('chatMessage', e.currentTarget.value.trim());
+                                    socketRef.current.send('chatMessage', e.currentTarget.value.trim());
                                     e.currentTarget.value = '';
                                 }
                             }} />
