@@ -287,6 +287,8 @@ export default function GameComponent() {
                     <div className={styles.hudSide}>
                         <div className={styles.nodeNavHeader}>WORLD_NAV</div>
                         <button className={styles.btnAction} onClick={() => setShowInventory(!showInventory)}>BACKPACK [F2]</button>
+                        <button className={styles.btnAction} onClick={() => socketRef.current?.send('lootItem')}>SCAN NETWORK [F3]</button>
+                        <button className={styles.btnAction} onClick={() => socketRef.current?.send('triggerEvolution')}>ADMIN OVRD [F4]</button>
                         <div style={{ margin: '10px 0', borderBottom: '1px solid #444' }}></div>
                         <button className={styles.btnAction} onClick={() => changeRoom('mainframe')}>MAINFRAME</button>
                         <button className={styles.btnAction} onClick={() => changeRoom('lan_valley')}>LAN VALLEY</button>
@@ -369,34 +371,6 @@ export default function GameComponent() {
                 </div>
             )}
 
-            {showInventory && (
-                <div className={styles.inventoryModal}>
-                    <div className={styles.modalHeader}>
-                        <h2>BACKPACK_STORAGE</h2>
-                        <button onClick={() => setShowInventory(false)}>CLOSE [X]</button>
-                    </div>
-                    <div className={styles.inventoryGrid}>
-                        {inventory.length === 0 && <p className={styles.emptyMsg}>NO_ITEMS_DETECTED</p>}
-                        {inventory.map((item, i) => (
-                            <div key={i} className={styles.inventoryItem}>
-                                <h4>{item.name}</h4>
-                                <p>{item.desc}</p>
-                                <button onClick={() => { /* Use item logic */ }}>EXECUTE()</button>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {evolving && (
-                <div className={styles.evolutionOverlay}>
-                    <div className={styles.evolutionFlash}></div>
-                    <div className={styles.evolutionContent}>
-                        <h1 className={styles.glitchText}>RECONSTRUCTING...</h1>
-                        <p>{evolving.oldName} ➔ {evolving.newName}</p>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

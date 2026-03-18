@@ -65,7 +65,56 @@ export class CyberRoom extends Room<{ state: GameState }> {
 
     // Authoritative Combat Hit Registration
     this.onMessage("attack", (client, data) => {
-      // Server-side calculated damage
+      const player = this.state.players.get(client.sessionId);
+      const enemy = this.state.enemies.get(data.target);
+
+      if (player && enemy) {
+        // Send a battle uplink initialization
+        client.send("battleStart", {
+            playerDaemon: { name: player.name, hp: 100, level: player.level },
+            enemy: { name: enemy.name, hp: enemy.hp, level: enemy.level, type: enemy.type }
+        });
+      }
+    });
+
+    this.onMessage("battleAction", (client, data) => {
+        if (data.move === 'RUN') {
+            client.send("battleTurnResult", {
+                log: `[DISCONNECT] Uplink severed successfully. Scrambling IP...`,
+                playerDamageTaken: 0,
+                enemyDamageTaken: 5000 // Fake instant kill to end the battle loop immediately
+            });
+            return;
+        }
+
+        // Action is stateless on the server for now but calculates raw damage securely
+        const baseDamage = data.move === 'EXPLOIT()' ? 25 : 10;
+        const playerDamage = Math.floor(Math.random() * baseDamage) + 10;
+        const enemyDamage = Math.floor(Math.random() * 20) + 5;
+        
+        client.send("battleTurnResult", {
+            log: `[${data.move}] Executed against ${data.enemyState?.name || 'Target'}: Dealt ${playerDamage} SYS_DMG. Counter-attack received ${enemyDamage} SYS_DMG.`,
+            playerDamageTaken: enemyDamage,
+            enemyDamageTaken: playerDamage
+        });
+    });
+
+    this.onMessage("lootItem", (client, data) => {
+        // Pseudo-random loot generation when players hit loot nodes
+        const artifacts = [
+            "Encrypted Datapad", "Zero-day Exploit Disk", 
+            "Overclocked GPU", "EMP Grenade", "Quantum Key"
+        ];
+        const drawn = artifacts[Math.floor(Math.random() * artifacts.length)];
+        client.send("receiveItem", { name: drawn, desc: "A powerful relic left by an ancient hacker." });
+    });
+
+    this.onMessage("triggerEvolution", (client, data) => {
+        // Trigger the graphical evolution sequence on the client
+        client.send("evolutionTrigger", {
+            oldName: "Basic Avatar",
+            newName: "Elite Agent"
+        });
     });
 
     console.log("CyberWorld Room Created.");
