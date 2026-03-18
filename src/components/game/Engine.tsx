@@ -24,9 +24,21 @@ export default function GameComponent() {
     const [showInventory, setShowInventory] = useState(false);
     const [evolving, setEvolving] = useState<any>(null);
 
+    // Cyber Deck & Trial State (Expansion)
+    const [ram, setRam] = useState(100);
+    const [trialTime, setTrialTime] = useState(60);
+    const [showDeck, setShowDeck] = useState(false);
+
     const addSysLog = (msg: string) => {
         setSystemLogs(prev => [...prev.slice(-4), `> ${msg}`]);
     };
+
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setTrialTime(prev => Math.max(0, prev - 1));
+        }, 1000);
+        return () => clearInterval(timer);
+    }, []);
 
     useEffect(() => {
         async function initPhaser() {
@@ -311,6 +323,16 @@ export default function GameComponent() {
                             }} />
                         </div>
                     </div>
+
+                    {/* Cyber Deck HUD (Expansion) */}
+                    <div className={styles.deckLauncher} onClick={() => setShowDeck(!showDeck)}>
+                        <div className={styles.ramBar} style={{ width: `${ram}%` }}></div>
+                        <span>CYBER_DECK [TAB]</span>
+                    </div>
+
+                    <div className={styles.trialCountdown}>
+                        SESSION_EXPIRY: {trialTime}s
+                    </div>
                 </>
             )}
 
@@ -371,6 +393,28 @@ export default function GameComponent() {
                 </div>
             )}
 
+            {showDeck && (
+                <div className={styles.deckOverlay}>
+                    <div className={styles.deckContainer}>
+                        <div className={styles.deckHeader}>
+                            <h2>FURY-DECK V.4.0</h2>
+                            <button onClick={() => setShowDeck(false)}>X</button>
+                        </div>
+                        <div className={styles.deckBody}>
+                            <div className={styles.deckStats}>
+                                <div className={styles.statLine}>UPLINK: <span className={styles.hlt}>STABLE</span></div>
+                                <div className={styles.statLine}>RAM: <span className={styles.hlt}>{ram} MB</span></div>
+                                <div className={styles.statLine}>CORE: <span className={styles.hlt}>OVERCLOCKED</span></div>
+                            </div>
+                            <div className={styles.scriptGrid}>
+                                <button className={styles.scriptBtn} onClick={() => { if(ram >= 20) { setRam(r=>r-20); addSysLog("EXECUTING: PING_BREACH..."); socketRef.current.send('lootItem'); } }}>PING_BREACH [20MB]</button>
+                                <button className={styles.scriptBtn} onClick={() => { if(ram >= 50) { setRam(r=>r-50); addSysLog("EXECUTING: SYSTEM_FLARE..."); socketRef.current.send('triggerEvolution'); } }}>SYSTEM_FLARE [50MB]</button>
+                                <button className={styles.scriptBtn} onClick={() => { setRam(100); addSysLog("EXECUTING: REBOOT_RAM..."); }}>REBOOT_RAM [0MB]</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
