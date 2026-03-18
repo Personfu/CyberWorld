@@ -87,37 +87,89 @@ export class CyberRoom extends Room<{ state: GameState }> {
             return;
         }
 
-        // Action is stateless on the server for now but calculates raw damage securely
-        const baseDamage = data.move === 'EXPLOIT()' ? 25 : 10;
-        const playerDamage = Math.floor(Math.random() * baseDamage) + 10;
-        const enemyDamage = Math.floor(Math.random() * 20) + 5;
+        // Action is authoritative
+        let playerDamage = data.move === 'EXPLOIT()' ? 25 : 10;
+        let enemyDamage = Math.floor(Math.random() * 20) + 5;
+        let log = "";
+
+        // SPIDER FACTION ABILITY: HIGH AGILITY (30% Chance to Dodge EXPLOIT)
+        if (data.enemyState?.type === 'Spider' && data.move === 'EXPLOIT()' && Math.random() < 0.3) {
+            playerDamage = 0;
+            log = `[EVASION] ${data.enemyState.name} (Spider) scrambled the exploit code! Target IMMUNE. Counter-attack received ${enemyDamage} SYS_DMG.`;
+        } else {
+            playerDamage = Math.floor(Math.random() * playerDamage) + 10;
+            log = `[${data.move}] Executed against ${data.enemyState?.name || 'Target'}: Dealt ${playerDamage} SYS_DMG. Counter-attack received ${enemyDamage} SYS_DMG.`;
+        }
         
         client.send("battleTurnResult", {
-            log: `[${data.move}] Executed against ${data.enemyState?.name || 'Target'}: Dealt ${playerDamage} SYS_DMG. Counter-attack received ${enemyDamage} SYS_DMG.`,
+            log: log,
             playerDamageTaken: enemyDamage,
             enemyDamageTaken: playerDamage
         });
     });
 
+    this.onMessage("useScript", (client, data) => {
+        const player = this.state.players.get(client.sessionId);
+        if (!player) return;
+
+        const scripts: any = {
+            "PING_BREACH": { ram: 20, callback: () => this.generateLoot(player) },
+            "SYSTEM_FLARE": { ram: 50, callback: () => this.triggerEvolution(player) },
+            "REBOOT_RAM": { ram: 0, callback: () => player.ram = 100 }
+        };
+
+        const script = scripts[data.scriptName];
+        if (script && player.ram >= script.ram) {
+            player.ram -= script.ram;
+            script.callback();
+            console.log(`[CyberRoom] Authoritative script execution: ${data.scriptName} by ${player.name}`);
+        } else {
+            client.send("error", "Insufficient RAM for this operation.");
+        }
+    });
+
     this.onMessage("lootItem", (client, data) => {
-        // Pseudo-random loot generation when players hit loot nodes
-        const artifacts = [
-            "Encrypted Datapad", "Zero-day Exploit Disk", 
-            "Overclocked GPU", "EMP Grenade", "Quantum Key"
-        ];
-        const drawn = artifacts[Math.floor(Math.random() * artifacts.length)];
-        client.send("receiveItem", { name: drawn, desc: "A powerful relic left by an ancient hacker." });
+        // Keeping as a fallback trigger
+        const player = this.state.players.get(client.sessionId);
+        if (player) this.generateLoot(player);
     });
 
     this.onMessage("triggerEvolution", (client, data) => {
-        // Trigger the graphical evolution sequence on the client
-        client.send("evolutionTrigger", {
-            oldName: "Basic Avatar",
-            newName: "Elite Agent"
-        });
+        const player = this.state.players.get(client.sessionId);
+        if (player) this.triggerEvolution(player);
     });
 
     console.log("CyberWorld Room Created.");
+  }
+
+  generateLoot(player: any) {
+    const artifacts = [
+        "Encrypted Datapad", "Zero-day Exploit Disk", 
+        "Overclocked GPU", "EMP Grenade", "Quantum Key"
+    ];
+    const drawn = artifacts[Math.floor(Math.random() * artifacts.length)];
+    player.inventory.push(drawn);
+    this.broadcast("system_broadcast", `${player.name} discovered an artifact: ${drawn}`);
+    
+    // We can still send the detailed UI update to the specific client
+    const client = this.clients.find(c => c.sessionId === player.id);
+    if (client) {
+        client.send("receiveItem", { name: drawn, desc: "A powerful relic secured in your authoritative inventory." });
+    }
+  }
+
+  triggerEvolution(player: any) {
+    const oldName = player.name;
+    player.level += 1;
+    player.name = `Elite_${player.name}`;
+    
+    const client = this.clients.find(c => c.sessionId === player.id);
+    if (client) {
+        client.send("evolutionTrigger", {
+            oldName: oldName,
+            newName: player.name
+        });
+    }
   }
 
   onJoin(client: Client, options: any, auth: any) {

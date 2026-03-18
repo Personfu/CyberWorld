@@ -1,4 +1,4 @@
-import { Schema, type, MapSchema } from "@colyseus/schema";
+import { Schema, type, MapSchema, ArraySchema } from "@colyseus/schema";
 
 export class Enemy extends Schema {
   @type("string") id: string = "";
@@ -16,8 +16,10 @@ export class Player extends Schema {
   @type("number") x: number = 0;
   @type("number") y: number = 0;
   @type("number") hp: number = 100;
+  @type("number") ram: number = 100;
   @type("number") level: number = 1;
   @type("string") color: string = "0xffffff";
+  @type(["string"]) inventory = new ArraySchema<string>();
 }
 
 export class GameState extends Schema {

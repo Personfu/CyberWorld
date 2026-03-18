@@ -111,12 +111,17 @@ export default function GameComponent() {
                         room.state.players.onAdd((player: any, sessionId: string) => {
                             if (sessionId === room.sessionId) {
                                 addPlayer(self, { x: player.x, y: player.y, level: player.level || 1, name: player.name || 'Agent', color: '0x00ffcc', playerId: sessionId, credits: 0 });
+                                setRam(player.ram);
+                                setInventory([...player.inventory]);
                             } else {
                                 addOtherPlayers(self, { x: player.x, y: player.y, name: player.name || 'Agent', color: '0xff00cc', playerId: sessionId });
                             }
 
                             player.onChange(() => {
-                                if (sessionId !== room.sessionId) {
+                                if (sessionId === room.sessionId) {
+                                    setRam(player.ram);
+                                    setInventory([...player.inventory]);
+                                } else {
                                     self.otherPlayers.getChildren().forEach((p: any) => {
                                         if (p.playerId === sessionId) startMoveCoroutine(self, p, player.x, player.y);
                                     });
@@ -407,9 +412,9 @@ export default function GameComponent() {
                                 <div className={styles.statLine}>CORE: <span className={styles.hlt}>OVERCLOCKED</span></div>
                             </div>
                             <div className={styles.scriptGrid}>
-                                <button className={styles.scriptBtn} onClick={() => { if(ram >= 20) { setRam(r=>r-20); addSysLog("EXECUTING: PING_BREACH..."); socketRef.current.send('lootItem'); } }}>PING_BREACH [20MB]</button>
-                                <button className={styles.scriptBtn} onClick={() => { if(ram >= 50) { setRam(r=>r-50); addSysLog("EXECUTING: SYSTEM_FLARE..."); socketRef.current.send('triggerEvolution'); } }}>SYSTEM_FLARE [50MB]</button>
-                                <button className={styles.scriptBtn} onClick={() => { setRam(100); addSysLog("EXECUTING: REBOOT_RAM..."); }}>REBOOT_RAM [0MB]</button>
+                                <button className={styles.scriptBtn} onClick={() => { socketRef.current.send('useScript', { scriptName: 'PING_BREACH' }); }}>PING_BREACH [20MB]</button>
+                                <button className={styles.scriptBtn} onClick={() => { socketRef.current.send('useScript', { scriptName: 'SYSTEM_FLARE' }); }}>SYSTEM_FLARE [50MB]</button>
+                                <button className={styles.scriptBtn} onClick={() => { socketRef.current.send('useScript', { scriptName: 'REBOOT_RAM' }); }}>REBOOT_RAM [0MB]</button>
                             </div>
                         </div>
                     </div>
