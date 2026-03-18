@@ -80,6 +80,12 @@ export class CyberRoom extends Room<{ state: GameState }> {
     newPlayer.y = 100 + Math.random() * 200;
     
     this.state.players.set(client.sessionId, newPlayer);
+
+    // Free account limitation: shut access off after 1 minute
+    this.clock.setTimeout(() => {
+        client.send("system_message", "Free trial expired. Your 1-minute access has concluded. Please upgrade to Basic or Premium to restore your connection.");
+        client.leave(4403, "Trial Expired. Upgrade required.");
+    }, 60000);
   }
 
   onLeave(client: Client, code?: number) {
