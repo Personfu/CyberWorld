@@ -218,7 +218,10 @@ export default function GameComponent() {
                         return;
                     }
 
-                    const tx = pointer.worldX; const ty = pointer.worldY;
+                    // RuneScape Style: Snap to 32x32 Grid
+                    const tx = Math.floor(pointer.worldX / 32) * 32 + 16;
+                    const ty = Math.floor(pointer.worldY / 32) * 32 + 16;
+                    
                     startMoveCoroutine(self, self.player, tx, ty);
                     self.room.send('move', { x: tx, y: ty });
                 });
@@ -281,7 +284,7 @@ export default function GameComponent() {
         return () => { if (gameRef.current) { gameRef.current.destroy(true); gameRef.current = null; } };
     }, []);
 
-    const changeRoom = (newRoom: string) => { if (socketRef.current) socketRef.current.send('changeRoom', newRoom); };
+    const changeSector = (sector: string) => { if (socketRef.current) socketRef.current.send('changeSector', { sector }); };
     const castMove = (move: string) => { if (socketRef.current && inBattle) socketRef.current.send('battleAction', { move, enemyState: battleData.enemy }); };
 
     return (
@@ -292,10 +295,14 @@ export default function GameComponent() {
                 <>
                     <div className={styles.hudTop}>
                         <div className={styles.hudPanel}>
-                            <h2>{roomInfo.name}</h2>
+                            <h2 className="flex items-center gap-2">
+                               {roomInfo.name}
+                               <span className="text-[9px] bg-red-900/40 px-1 text-white animate-pulse">LIVE_INTEL</span>
+                            </h2>
                             <p>{roomInfo.desc}</p>
                         </div>
                         <div className={styles.hudPanelRight}>
+                            <div className="text-[9px] text-[#00ffcc] font-black italic mb-1">BY PRESTON FURULIE</div>
                             <div>NODE_ACCESS: <span className={styles.hlt}>{level}</span></div>
                             <div>CREDITS: <span className={styles.hlt}>{score}</span> F-COIN</div>
                         </div>
@@ -305,13 +312,25 @@ export default function GameComponent() {
                         <div className={styles.nodeNavHeader}>WORLD_NAV</div>
                         <button className={styles.btnAction} onClick={() => setShowInventory(!showInventory)}>BACKPACK [F2]</button>
                         <button className={styles.btnAction} onClick={() => socketRef.current?.send('lootItem')}>SCAN NETWORK [F3]</button>
-                        <button className={styles.btnAction} onClick={() => socketRef.current?.send('triggerEvolution')}>ADMIN OVRD [F4]</button>
+                        
+                        <div className="my-2 border-t border-white/20 pt-2">
+                           <div className="text-[10px] text-yellow-400 font-bold mb-1">SKILLS [V.4]</div>
+                           <div className="text-[9px] flex justify-between leading-tight text-gray-400"><span>EXPLOIT:</span> <span className="text-white">Lv.{level}</span></div>
+                           <div className="text-[9px] flex justify-between leading-tight text-gray-400"><span>FIREWALL:</span> <span className="text-white">Lv.{Math.floor(level/2)}</span></div>
+                           <div className="text-[9px] flex justify-between leading-tight text-gray-400"><span>FORENSICS:</span> <span className="text-white">Lv.1</span></div>
+                        </div>
+
+                        {level >= 10 && (
+                            <div className="bg-blue-900/40 p-1 mb-2 border border-blue-400 text-[10px]">
+                                <div className="font-bold text-blue-300">NASA_ENGINEER_UPLINK</div>
+                                <div className="text-[8px] italic text-blue-100">Hardware authorized for Orbital Ops.</div>
+                            </div>
+                        )}
+
                         <div style={{ margin: '10px 0', borderBottom: '1px solid #444' }}></div>
-                        <button className={styles.btnAction} onClick={() => changeRoom('mainframe')}>MAINFRAME</button>
-                        <button className={styles.btnAction} onClick={() => changeRoom('lan_valley')}>LAN VALLEY</button>
-                        <button className={styles.btnAction} onClick={() => changeRoom('packet_plains')}>PACKET PLAINS</button>
-                        <button className={styles.btnAction} onClick={() => changeRoom('wireless_woods')}>WIRELESS WOODS</button>
-                        <button className={styles.btnAction} onClick={() => changeRoom('darknet_depths')}>DARKNET</button>
+                        <button className={styles.btnAction} onClick={() => changeSector('mainframe')}>MAINFRAME</button>
+                        <button className={styles.btnAction} onClick={() => changeSector('lan_valley')}>LAN VALLEY</button>
+                        <button className={styles.btnAction} onClick={() => changeSector('darknet_depths')}>DARKNET</button>
                     </div>
 
                     <div className={styles.chatWrapper}>
@@ -337,6 +356,7 @@ export default function GameComponent() {
 
                     <div className={styles.trialCountdown}>
                         SESSION_EXPIRY: {trialTime}s
+                        <div className="text-[8px] text-gray-500 mt-1 uppercase">Made by Preston Furulie</div>
                     </div>
                 </>
             )}

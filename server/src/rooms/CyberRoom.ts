@@ -78,34 +78,68 @@ export class CyberRoom extends Room<{ state: GameState }> {
     });
 
     this.onMessage("battleAction", (client, data) => {
+        const player = this.state.players.get(client.sessionId);
+        if (!player) return;
+
         if (data.move === 'RUN') {
             client.send("battleTurnResult", {
                 log: `[DISCONNECT] Uplink severed successfully. Scrambling IP...`,
                 playerDamageTaken: 0,
-                enemyDamageTaken: 5000 // Fake instant kill to end the battle loop immediately
+                enemyDamageTaken: 5000 
             });
             return;
         }
 
         // Action is authoritative
-        let playerDamage = data.move === 'EXPLOIT()' ? 25 : 10;
-        let enemyDamage = Math.floor(Math.random() * 20) + 5;
+        let playerDamage = data.move === 'EXPLOIT()' ? 35 : 15;
+        let enemyDamage = Math.floor(Math.random() * 15) + 8;
         let log = "";
 
-        // SPIDER FACTION ABILITY: HIGH AGILITY (30% Chance to Dodge EXPLOIT)
-        if (data.enemyState?.type === 'Spider' && data.move === 'EXPLOIT()' && Math.random() < 0.3) {
+        const enemyType = data.enemyState?.type || 'Standard';
+
+        // FACTION ABILITIES
+        if (enemyType === 'Spider' && data.move === 'EXPLOIT()' && Math.random() < 0.3) {
             playerDamage = 0;
-            log = `[EVASION] ${data.enemyState.name} (Spider) scrambled the exploit code! Target IMMUNE. Counter-attack received ${enemyDamage} SYS_DMG.`;
+            log = `[EVASION] ${data.enemyState.name} (Spider) scrambled the exploit code! Target IMMUNE.`;
+        } else if (enemyType === 'Bear') {
+            playerDamage = Math.floor(playerDamage * 0.5); // 50% Tank reduction
+            log = `[REINFORCED] ${data.enemyState.name} (Bear) hardened its shell! Damage reduced.`;
+        } else if (enemyType === 'Panda') {
+            const regen = 5;
+            // Panda regen logic - would ideally update actual enemy HP state here if possible
+            log = `[REGEN] ${data.enemyState.name} (Panda) stabilized its core! Restructuring files (+${regen} HP).`;
         } else {
             playerDamage = Math.floor(Math.random() * playerDamage) + 10;
-            log = `[${data.move}] Executed against ${data.enemyState?.name || 'Target'}: Dealt ${playerDamage} SYS_DMG. Counter-attack received ${enemyDamage} SYS_DMG.`;
+            log = `[${data.move}] Executed against ${data.enemyState?.name || 'Target'}: Dealt ${playerDamage} SYS_DMG.`;
         }
+        
+        log += ` Counter-attack received ${enemyDamage} SYS_DMG.`;
         
         client.send("battleTurnResult", {
             log: log,
             playerDamageTaken: enemyDamage,
             enemyDamageTaken: playerDamage
         });
+    });
+
+    this.onMessage("changeSector", (client, data) => {
+        const newSector = data.sector;
+        console.log(`[CyberRoom] Sector swap requested: ${newSector}`);
+        this.broadcast("sector_update", { sector: newSector, status: "CALIBRATING", msg: `Synchronizing with ${newSector} data-mesh...` });
+        
+        // Random world event: Boss Spawn
+        if (Math.random() < 0.2) {
+            const boss = new Enemy();
+            boss.id = `boss_${Date.now()}`;
+            boss.name = "STORMCORE_REVENANT";
+            boss.type = "Elite_Cyber_Daemon";
+            boss.x = 500;
+            boss.y = 500;
+            boss.hp = 500;
+            boss.level = 99;
+            this.state.enemies.set(boss.id, boss);
+            this.broadcast("system_message", "CRITICAL ALERT: High-value target STORMCORE_REVENANT has breached the mainframe!");
+        }
     });
 
     this.onMessage("useScript", (client, data) => {
@@ -129,7 +163,6 @@ export class CyberRoom extends Room<{ state: GameState }> {
     });
 
     this.onMessage("lootItem", (client, data) => {
-        // Keeping as a fallback trigger
         const player = this.state.players.get(client.sessionId);
         if (player) this.generateLoot(player);
     });
@@ -139,7 +172,7 @@ export class CyberRoom extends Room<{ state: GameState }> {
         if (player) this.triggerEvolution(player);
     });
 
-    console.log("CyberWorld Room Created.");
+    console.log("CyberWorld Advanced Sector Room Initialized.");
   }
 
   generateLoot(player: any) {
@@ -182,11 +215,18 @@ export class CyberRoom extends Room<{ state: GameState }> {
     
     this.state.players.set(client.sessionId, newPlayer);
 
-    // Free account limitation: shut access off after 1 minute
-    this.clock.setTimeout(() => {
-        client.send("system_message", "Free trial expired. Your 1-minute access has concluded. Please upgrade to Basic or Premium to restore your connection.");
-        client.leave(4403, "Trial Expired. Upgrade required.");
-    }, 60000);
+    // Tiered access control
+    const tier = auth.tier || 'Free';
+    console.log(`[CyberRoom] Session uplink: ${auth.name} (${tier})`);
+
+    if (tier === 'Free') {
+        this.clock.setTimeout(() => {
+            client.send("system_message", "Free trial expired. Your 1-minute access has concluded. Please upgrade to Basic ($25) or Premium ($49) at fllc.net/shop to restore your connection.");
+            client.leave(4403, "Trial Expired. Upgrade required.");
+        }, 60000);
+    } else {
+        client.send("system_message", `Uplink Stable. Welcome back, ${tier} Operative.`);
+    }
   }
 
   onLeave(client: Client, code?: number) {
