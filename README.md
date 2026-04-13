@@ -1,36 +1,43 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+<h1 align="center">CYBERWORLD</h1>
 
-## Getting Started
+<p align="center"><b>The Ultimate Cybersecurity MMORPG</b></p>
 
-First, run the development server:
+---
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+CyberWorld is a retro-futuristic, browser-based MMO where you become a digital operative in a world of rogue AIs, encrypted sectors, and cyber warfare. Inspired by classics like Club Penguin, RuneScape, and Pokémon, but reimagined for the cyber age.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## What is CyberWorld?
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+CyberWorld is a persistent online world where you:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- Uplink to the grid and claim your node
+- Explore sectors, battle rogue daemons, and collect loot
+- Team up with other operatives in real-time chat
+- Level up, unlock new skills, and evolve your digital avatar
+- Compete in daily challenges and global events
+- Experience a living world with live news, events, and global stats
 
-## Learn More
+## Features
 
-To learn more about Next.js, take a look at the following resources:
+- **MMORPG Gameplay:** Real-time multiplayer, chat, and world events
+- **Cyber Battles:** Fight daemons, breach firewalls, and collect rare items
+- **Skill Trees & Inventory:** Upgrade your operative and customize your playstyle
+- **Sector Exploration:** Mainframe, LAN Valley, Darknet Depths, and more
+- **Retro OS Aesthetic:** Windows 98 vibes, CRT effects, and pixel art
+- **Live Events:** Patch notes, featured operatives, and daily challenges
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Play Now
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Visit the live game: https://cyberworld-ten.vercel.app
 
-## Deploy on Vercel
+## Screenshots
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+![CyberWorld Screenshot](public/screenshot.png)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Credits
+
+Created by Preston Furulie (Personfu) and the FLLC team.
+
+---
+
+<p align="center"><i>"The definitive MMORPG for the modern operative. Explore sectors, battle rogue daemons, and claim your node in the mesh."</i></p>
