@@ -67,15 +67,16 @@ export default function Page() {
               </div>
           </div>
           
-          <div className="toolbar">
-              <span><u>F</u>ile</span><span><u>E</u>dit</span><span><u>V</u>iew</span><span><u>S</u>ecurity</span><span><u>H</u>elp</span>
-          </div>
-          
-          <div className="toolbar address-bar">
-              <span>Address:</span>
-              <input type="text" value="https://personfu.github.io/cyberworld/mmo" readOnly />
-              <button>Go</button>
-          </div>
+            <div className="toolbar" style={{ fontSize: '10px', padding: '2px 0', minHeight: '18px', background: '#e0e0e0', borderBottom: '1px solid #b0b0b0' }}>
+              <span style={{ marginRight: 8 }}><u>F</u>ile</span>
+              <span style={{ marginRight: 8 }}><u>E</u>dit</span>
+              <span style={{ marginRight: 8 }}><u>V</u>iew</span>
+              <span style={{ marginRight: 8 }}><u>S</u>ecurity</span>
+              <span style={{ marginRight: 8 }}><u>H</u>elp</span>
+              <span style={{ marginLeft: 16, color: '#444' }}>Address:</span>
+              <input style={{ fontSize: '10px', width: 260, marginLeft: 4, marginRight: 2, padding: '1px 4px', border: '1px solid #bbb', background: '#fff' }} type="text" value="https://personfu.github.io/cyberworld/mmo" readOnly />
+              <button style={{ fontSize: '10px', padding: '0 8px', height: 18 }}>Go</button>
+            </div>
 
           <div className="browser-content">
               {!isPlaying && (
@@ -132,15 +133,52 @@ export default function Page() {
                           </div>
                       </div>
 
-                      <div className="chat-widget">
-                          <div className="game-title" style={{fontSize: '11px', background: '#800000', padding: '2px 8px'}}>INTEL_ALERTS</div>
-                          <div className="chat-log font-mono text-[10px] space-y-2 !bg-black !text-green-500 overflow-y-auto" style={{height: '150px', padding: '8px'}}>
-                              <div>[SYSTEM]: New target detected in Sector 4.</div>
-                              <div className="text-yellow-500">[WARN]: Unauthorized access detected on node 12.3.4.1</div>
-                              <div>[ALPHA]: Team update scheduled for 22:00.</div>
-                              <div className="text-red-500">[ALERT]: Breach in LAN Valley firewall.</div>
-                              <div>[PRESTON]: Stay sharp, operatives.</div>
-                          </div>
+                      {/* GAMEPLAY STEPS, LORE, ACHIEVEMENTS, SECTOR PREVIEW */}
+                      <div className="chat-widget" style={{ background: '#181818', color: '#00ffcc', fontFamily: 'monospace', fontSize: '12px', border: '2px solid #00ffcc', borderRadius: 6, minHeight: 220, padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        <div style={{ fontWeight: 'bold', fontSize: 13, marginBottom: 2 }}>GAME OBJECTIVES</div>
+                        <ol style={{ marginLeft: 16, marginBottom: 4 }}>
+                          <li>Uplink to the grid</li>
+                          <li>Explore sectors and nodes</li>
+                          <li>Battle rogue daemons</li>
+                          <li>Collect items and upgrades</li>
+                          <li>Unlock new skills and sectors</li>
+                          <li>Compete with other operatives</li>
+                        </ol>
+                        <div style={{ fontWeight: 'bold', fontSize: 13, margin: '4px 0 2px' }}>CYBERWORLD LORE</div>
+                        <div style={{ fontSize: 11, color: '#aaffee', marginBottom: 2 }}>
+                          In 2044, the world is a mesh of rogue AIs, encrypted sectors, and digital operatives. Only the best can claim a node in the grid. Will you rise to the top, or be lost in the datastream?
+                        </div>
+                        <div style={{ fontWeight: 'bold', fontSize: 13, margin: '4px 0 2px' }}>ACHIEVEMENTS</div>
+                        <ul style={{ marginLeft: 16, marginBottom: 2, fontSize: 11 }}>
+                          <li>🟢 First Uplink</li>
+                          <li>🔵 Sector Explorer</li>
+                          <li>🟣 Daemon Slayer</li>
+                          <li>🟡 Node Tycoon</li>
+                          <li>🔴 Top Operative</li>
+                        </ul>
+                        <div style={{ fontWeight: 'bold', fontSize: 13, margin: '4px 0 2px' }}>SECTOR PREVIEW</div>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 11 }}>
+                          <div style={{ background: '#003344', padding: '4px 8px', borderRadius: 3 }}>🌐 Mainframe</div>
+                          <div style={{ background: '#222244', padding: '4px 8px', borderRadius: 3 }}>🛡️ LAN Valley</div>
+                          <div style={{ background: '#440044', padding: '4px 8px', borderRadius: 3 }}>🕳️ Darknet Depths</div>
+                          <div style={{ background: '#444400', padding: '4px 8px', borderRadius: 3 }}>⚡ Stormcore</div>
+                        </div>
+                        <div style={{ fontWeight: 'bold', fontSize: 13, margin: '4px 0 2px' }}>QUICK ACTIONS</div>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                          <button style={{ fontSize: 11, padding: '2px 8px', background: '#00ffcc', color: '#000', border: 'none', borderRadius: 3, cursor: 'pointer', transition: 'background 0.2s', boxShadow: '0 1px 4px #00ffcc44' }} onMouseOver={e => e.currentTarget.style.background='#00e8ff'} onMouseOut={e => e.currentTarget.style.background='#00ffcc'} onClick={handlePlayClick}>▶ Start Game</button>
+                          <button style={{ fontSize: 11, padding: '2px 8px', background: '#222', color: '#00ffcc', border: '1px solid #00ffcc', borderRadius: 3, cursor: 'pointer', transition: 'background 0.2s' }} onMouseOver={e => e.currentTarget.style.background='#003344'} onMouseOut={e => e.currentTarget.style.background='#222'} onClick={() => alert('Feature coming soon!')}>🏆 Leaderboard</button>
+                          <button style={{ fontSize: 11, padding: '2px 8px', background: '#222', color: '#00ffcc', border: '1px solid #00ffcc', borderRadius: 3, cursor: 'pointer', transition: 'background 0.2s' }} onMouseOver={e => e.currentTarget.style.background='#003344'} onMouseOut={e => e.currentTarget.style.background='#222'} onClick={() => alert('Feature coming soon!')}>🎒 Inventory</button>
+                          <button style={{ fontSize: 11, padding: '2px 8px', background: '#222', color: '#00ffcc', border: '1px solid #00ffcc', borderRadius: 3, cursor: 'pointer', transition: 'background 0.2s' }} onMouseOver={e => e.currentTarget.style.background='#003344'} onMouseOut={e => e.currentTarget.style.background='#222'} onClick={() => alert('Feature coming soon!')}>🌲 Skill Tree</button>
+                        </div>
+                        <div style={{ marginTop: 6, fontSize: 11, color: '#aaa' }}>
+                          <span style={{ color: '#00ffcc' }}>Tip:</span> Use the chat to coordinate with other operatives!
+                        </div>
+                        <div style={{ marginTop: 6, fontSize: 11, color: '#ffeb3b', background: '#222', borderRadius: 3, padding: '4px 8px', fontWeight: 'bold' }}>
+                          Daily Challenge: Defeat 3 rogue daemons in LAN Valley for a bonus reward!
+                        </div>
+                        <div style={{ marginTop: 6, fontSize: 11, color: '#00e8ff', background: '#111', borderRadius: 3, padding: '4px 8px' }}>
+                          <span style={{ color: '#00ffcc', fontWeight: 'bold' }}>Sector Tip:</span> "Stormcore is most active at night. Bring extra RAM!"
+                        </div>
                       </div>
                     </div>
                   )}
