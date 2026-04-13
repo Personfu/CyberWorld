@@ -134,7 +134,35 @@ export default function Page() {
                       </div>
 
                       {/* GAMEPLAY STEPS, LORE, ACHIEVEMENTS, SECTOR PREVIEW */}
-                      <div className="chat-widget" style={{ background: '#181818', color: '#00ffcc', fontFamily: 'monospace', fontSize: '12px', border: '2px solid #00ffcc', borderRadius: 6, minHeight: 220, padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      <div className="chat-widget" style={{ background: '#181818', color: '#00ffcc', fontFamily: 'monospace', fontSize: '12px', border: '2px solid #00ffcc', borderRadius: 6, minHeight: 340, padding: 12, display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 600, overflowY: 'auto' }}>
+                                                <div style={{ fontWeight: 'bold', fontSize: 13, margin: '4px 0 2px', color: '#ffeb3b' }}>NEWS & EVENTS</div>
+                                                <ul style={{ marginLeft: 16, marginBottom: 2, fontSize: 11, color: '#fffbe7' }}>
+                                                  <li>🔥 <b>Patch 2.6:</b> LAN Valley expanded! New daemons and loot.</li>
+                                                  <li>🕵️‍♂️ <b>Event:</b> "Operation Blackout" live this weekend!</li>
+                                                  <li>⚡ <b>Notice:</b> Server maintenance 04/15 02:00 UTC.</li>
+                                                </ul>
+
+                                                <div style={{ fontWeight: 'bold', fontSize: 13, margin: '4px 0 2px', color: '#00e8ff' }}>FEATURED OPERATIVE</div>
+                                                <div style={{ background: '#003344', borderRadius: 3, padding: '4px 8px', fontSize: 11, color: '#fff' }}>
+                                                  <b>Agent_Zero</b> — "First to breach the Stormcore firewall!"
+                                                </div>
+
+                                                <div style={{ fontWeight: 'bold', fontSize: 13, margin: '4px 0 2px', color: '#00ff41' }}>QUICK START GUIDE</div>
+                                                <ol style={{ marginLeft: 16, marginBottom: 2, fontSize: 11, color: '#eaffd0' }}>
+                                                  <li>Click <b>Start Game</b> to uplink.</li>
+                                                  <li>Use chat to ask for help or form a team.</li>
+                                                  <li>Explore sectors and defeat daemons for loot.</li>
+                                                  <li>Open your inventory and skill tree to upgrade.</li>
+                                                  <li>Complete daily challenges for rewards!</li>
+                                                </ol>
+
+                                                <div style={{ fontWeight: 'bold', fontSize: 13, margin: '4px 0 2px', color: '#ff4081' }}>GLOBAL STATS</div>
+                                                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 11, color: '#fff' }}>
+                                                  <div>🟢 <b>Players Online:</b> 1,204</div>
+                                                  <div>👾 <b>Daemons Defeated:</b> 8,392</div>
+                                                  <div>🌐 <b>Sectors Unlocked:</b> 17</div>
+                                                  <div>🏆 <b>Top Operative:</b> Agent_Zero</div>
+                                                </div>
                         <div style={{ fontWeight: 'bold', fontSize: 13, marginBottom: 2 }}>GAME OBJECTIVES</div>
                         <ol style={{ marginLeft: 16, marginBottom: 4 }}>
                           <li>Uplink to the grid</li>
